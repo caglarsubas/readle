@@ -152,4 +152,59 @@ class LibraryPersistenceTest {
         importer.process(failed)
         assertEquals(row(first).getString("bookId"), row(duplicate).getString("bookId"))
     }
+
+    @Test
+    fun reimportRepairsMissingSourceWithoutLosingSavedSession() {
+        val source = File(context.cacheDir, "repair-test.epub")
+        context.assets.open("fixtures/readle-sample.epub").use { input ->
+            source.outputStream().use { input.copyTo(it) }
+        }
+        // A unique ZIP comment keeps the repair fixture separate from manual UAT source blobs.
+        val uniqueSource = File(context.cacheDir, "unique-repair-test.epub")
+        java.util.zip.ZipFile(source).use { archive ->
+            java.util.zip.ZipOutputStream(uniqueSource.outputStream()).use { output ->
+                output.setComment(java.util.UUID.randomUUID().toString())
+                archive.entries().asSequence().forEach { entry ->
+                    val copiedEntry =
+                        java.util.zip.ZipEntry(entry.name).apply {
+                            method = entry.method
+                            if (method == java.util.zip.ZipEntry.STORED) {
+                                size = entry.size
+                                crc = entry.crc
+                            }
+                        }
+                    output.putNextEntry(copiedEntry)
+                    archive.getInputStream(entry).use { it.copyTo(output) }
+                    output.closeEntry()
+                }
+            }
+        }
+        val importer = BookImporter(context, db)
+        val first = importer.register(Uri.fromFile(uniqueSource), "Repair fixture.epub")
+        importer.process(first)
+        val sourceBook =
+            db.query("SELECT bookId FROM imports WHERE id = ?", arrayOf(first))
+                .getJSONObject(0)
+                .getString("bookId")
+        val session = db.createSession(sourceBook).getString("id")
+        db.mutateSession(session) { it.put("readingLocator", JSONObject().put("position", 9)) }
+        val stored = File(db.book(sourceBook).getString("path"))
+        assertTrue(stored.delete())
+        val retry = importer.register(Uri.fromFile(uniqueSource), "Repair fixture.epub")
+        importer.process(retry)
+        assertTrue(stored.readBytes().contentEquals(uniqueSource.readBytes()))
+        assertEquals(
+            sourceBook,
+            db.query("SELECT bookId FROM imports WHERE id = ?", arrayOf(retry))
+                .getJSONObject(0)
+                .getString("bookId"),
+        )
+        assertEquals(
+            9,
+            JSONObject(db.session(session).getString("state"))
+                .getJSONObject("readingLocator")
+                .getInt("position"),
+        )
+        stored.delete()
+    }
 }

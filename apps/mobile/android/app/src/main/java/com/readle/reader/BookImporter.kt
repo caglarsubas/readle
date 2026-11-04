@@ -67,6 +67,10 @@ class BookImporter(private val context: Context, private val database: LibraryDa
                     .query("SELECT id FROM books WHERE sourceVersion = ?", arrayOf(hash))
                     .optJSONObject(0)
             if (existing != null) {
+                // Replace the blob atomically with identical bytes to repair a missing/corrupt
+                // local source while retaining the existing source identity and all sessions.
+                val existingBook = database.book(existing.getString("id"))
+                preserveSource(temporary, File(existingBook.getString("path")))
                 setStatus(id, "duplicate", bookId = existing.getString("id"))
                 return
             }
@@ -87,7 +91,7 @@ class BookImporter(private val context: Context, private val database: LibraryDa
             }
             val directory = File(context.filesDir, "books").apply { mkdirs() }
             val destination = File(directory, "$hash.$format")
-            temporary.copyTo(destination, overwrite = true)
+            preserveSource(temporary, destination)
             val bookId = UUID.randomUUID().toString()
             database.writableDatabase.beginTransaction()
             try {
@@ -111,6 +115,19 @@ class BookImporter(private val context: Context, private val database: LibraryDa
             setStatus(id, "failed", e.message ?: "Unsupported or unreadable file")
         } finally {
             temporary.delete()
+        }
+    }
+
+    private fun preserveSource(input: File, destination: File) {
+        val directory = requireNotNull(destination.parentFile).apply { mkdirs() }
+        val staging = File.createTempFile("source-", ".part", directory)
+        try {
+            input.copyTo(staging, overwrite = true)
+            check(staging.renameTo(destination)) {
+                "Could not store the original source. Retry this file."
+            }
+        } finally {
+            staging.delete()
         }
     }
 

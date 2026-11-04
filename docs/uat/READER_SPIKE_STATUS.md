@@ -1,13 +1,13 @@
 # Reader spike handoff
 
-Date is 2026-11-04. Phase A is in progress. Android build 9 is an internal UAT build. The full product and the Phase A acceptance gate remain pending.
+Date is 2026-11-04. Phase A is in progress. Android build 10 is an internal UAT build. The full product and the Phase A acceptance gate remain pending.
 
 ## Build
 
 - Application ID is `com.readle.uat`.
-- Version code is 9, version name is `0.1.0-spike`, minimum Android API is 24, target is 36.
+- Version code is 10, version name is `0.1.0-spike`, minimum Android API is 24, target is 36.
 - The APK is supplied privately from the workspace output directory and contains its JavaScript bundle. It starts without Metro, a backend, an account or an AI key.
-- SHA-256 is `a1fbc66d2d24ecd60fdfadc83da25603ed9df80e7c1702dcdcc7e773358ba7a6`.
+- SHA-256 is `4e1b450bdcf999e7c60b4b628b1cd72f32eb2a540c112f687bb628bfd35bf465`.
 - Signing certificate SHA-256 is `0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5`.
 - The signing key and password remain outside the repository under the builder's private `~/.local/share/readle` directory.
 
@@ -20,7 +20,7 @@ Checks ran on an isolated Pixel 7 Android API 36 arm64 emulator. No physical-dev
 | TypeScript type check | Pass |
 | ESLint on source, excluding generated Android assets | Pass |
 | React Native UI regressions | 3 tests pass |
-| Native SQLite/import instrumentation | 4 tests pass |
+| Native SQLite/import instrumentation | 5 tests pass |
 | Signed standalone release build and signature verification | Pass |
 | PDF original-page rendering and page navigation | Pass on emulator |
 | Static EPUB rendering, contents navigation and font-size change | Pass on emulator |
@@ -34,7 +34,7 @@ Checks ran on an isolated Pixel 7 Android API 36 arm64 emulator. No physical-dev
 | PDF continuous cross-page dragging, pinch zoom and full accessibility | Pending |
 | Named hardware performance targets and physical iOS/Android acceptance | Pending |
 
-Source-level storage tests verify independent workspace fields and shared annotations after closing/reopening SQLite, stale revision rejection, book-scoped session isolation, and corrupt-file/duplicate import isolation. UI tests verify inspection creates no session, Continue latest reopens the stored ID, and a new session opens its new ID. The instrumentation database is isolated from manual UAT data.
+Source-level storage tests verify independent workspace fields and shared annotations after closing/reopening SQLite, stale revision rejection, book-scoped session isolation, corrupt-file/duplicate import isolation, and restoration of a missing source through reimport while retaining the saved session. UI tests verify inspection creates no session, Continue latest reopens the stored ID, and a new session opens its new ID. The instrumentation database is isolated from manual UAT data.
 
 ## Remaining work
 

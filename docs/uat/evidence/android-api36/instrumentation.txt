@@ -1,6 +1,5 @@
+com.readle.reader.LibraryPersistenceTest:.....
 
-com.readle.reader.LibraryPersistenceTest:....
+Time: 0.275
 
-Time: 0.264
-
-OK (4 tests)
+OK (5 tests)
