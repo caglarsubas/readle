@@ -1,0 +1,4 @@
+The Readle sample publications and their self-authored contents are dedicated to the public domain under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+These fixtures contain no third-party book excerpts. The figure is a hypothetical line drawn for selection/rendering tests.
