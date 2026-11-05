@@ -1,0 +1,9 @@
+# 022 — Independent session annotations
+
+Accepted 2026-11-05 from build 11 owner UAT. This supersedes the original plan's book-shared annotations. The owner wants **Start new session** to open a blank workspace, including no historical notes or highlights.
+
+Books retain their immutable source/version and shared file storage. Each annotation belongs to one session and that session's book/version. Listing, rendering, export, object actions, edits and deletion require the session ID. A new session copies no annotations, selections, conversation, cursor or learning state. Resuming an existing session restores its own work. Editing/deleting an annotation cannot change another session's copy or selection.
+
+SQLite schema 2 adds annotation session ownership. Schema 1 never recorded the originating session. The upgrade therefore preserves the formerly visible collection as independent copies in every already-existing session. One copy retains the original ID; other copies have new IDs, with `originId` retaining migration lineage. Quote, source anchor, note and timestamp are preserved. Existing session IDs, positions, revisions, drafts and activity timestamps remain unchanged. An orphaned legacy collection gets a recoverable **Recovered notes** session. Sessions created after migration are empty. The migration runs within SQLiteOpenHelper's upgrade transaction and does not modify source bytes.
+
+Verification includes a real schema-1 database upgrade, orphan recovery, independent edit/delete after migration, blank new sessions after reopening SQLite, and session-scoped native rendering. APK upgrades must preserve the signing identity. A schema-1 binary cannot safely open schema 2; rollback uses a compatible fix-forward build with a higher version code. Annotation export remains separate from full library backup.

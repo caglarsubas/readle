@@ -1,92 +1,51 @@
-# Install build 11 and run Android UAT
+# Install build 12 and run Android UAT
 
-The product owner is the Android UAT tester. Build 11 is a standalone, privately supplied APK, about 60 MiB, for Android 7.0/API 24 or newer. Its application ID is `com.readle.uat`, and it appears as Readle in the app list. It runs independently after installation. The current build covers the original reader and saved sessions. AI, courses and quizzes are later milestones.
+Build 12 is a privately supplied, signed standalone APK for Android 7.0/API 24 or newer. Application ID is `com.readle.uat`, version code 12, version name `0.1.0-spike`. It runs without a development server or AI key. EPUB is the primary reader; PDF is an original-source reference view.
 
-The APK is in `output/android/readle-uat-11.apk` on the build Mac. This is a local file path. The public Git repository contains the source and instructions. The current APK is supplied separately from this workspace. Its SHA-256 is `04789bac508fbc76236eda245b0f37e03a825dc766a4cf424c00fe967b69b326`.
+## Update the installed app
 
-## Install from the development Mac by USB
+1. Transfer `output/android/readle-uat-12.apk` from the development Mac to your Z Fold7, as you did for build 11.
+2. Open the APK in My Files and choose **Update**. Keep the installed app and its storage so existing work survives. The same signing identity is used.
+3. The built-in **Add sample books** action provides the self-authored EPUB/PDF fixtures. `output/android/readle-uat-12-fixtures.zip` also contains those files, an exact PDF duplicate and an intentionally corrupt PDF for import regression checks.
 
-The Android SDK and ADB are already installed on this Mac.
+The checksum and signer fingerprint are in [the build receipt](READER_SPIKE_STATUS.md). If Android requests permission to install from My Files, its [installation guidance](https://support.google.com/pixelphone/answer/7391672?hl=en) explains the setting.
 
-1. On the phone, open Settings and find Build number, usually under About phone or Software information. Tap Build number seven times and enter your unlock code if requested.
-2. Open Developer options in Settings and enable USB debugging.
-3. Connect the unlocked phone to the Mac with a data-capable USB cable. Accept the phone's Allow USB debugging prompt for this computer.
-4. In Terminal on this Mac, run the following command. It checks the APK checksum, targets one USB-connected phone, installs the app, copies four UAT import files into Downloads/Readle-UAT, and opens Readle.
+USB installation remains available with one authorized physical phone connected:
 
 ```sh
-/Users/caglarsubasi/Desktop/prometa/pocs/readle/scripts/install-android-uat.sh 11
+/Users/caglarsubasi/Desktop/prometa/pocs/readle/scripts/install-android-uat.sh 12
 ```
 
-If the script reports that it cannot see the phone, keep it unlocked, check the authorization prompt and USB cable, and run it again. If more than one physical device is attached, disconnect the others. For a different SDK location, set `READLE_ADB` to the full path of its `platform-tools/adb` executable.
+## Existing notes after the update
 
-The installer uses `adb install -r`, retaining existing app data during an update. After installation you can disconnect the cable and begin offline testing. Android's official setup and ADB instructions explain USB authorization and device detection. [Physical device setup](https://developer.android.com/studio/run/device#setting-up), [ADB instructions](https://developer.android.com/tools/adb#Enabling)
+Builds 10/11 stored annotations at book level and did not record which session created them. The upgrade preserves that collection as **independent copies in every existing session**. Editing/deleting a copy now affects only its own session. Old orphaned notes, if any, appear in a **Recovered notes** session. All sessions created after the upgrade start empty. Books, source files, session IDs and reading positions remain intact. PDF viewing changes to fit-width and no longer restores build 11's horizontal magnification.
 
-## Install by opening the APK on the phone
+## Build 12 feedback checklist
 
-1. Transfer the private `readle-uat-11.apk` file from the Mac to the phone using a private file-transfer method you already use. A separate `readle-uat-11-fixtures.zip` contains the four import-test files.
-2. Open Files/My Files on the phone and tap the APK.
-3. If prompted, open Settings for that file-opening app and enable Allow from this source under Install unknown apps. Return to the APK and choose Install, then Open. Menu names vary by manufacturer. [Google's installation instructions](https://support.google.com/pixelphone/answer/7391672?hl=en)
-4. For batch-import testing, extract the fixture ZIP into Downloads/Readle-UAT.
-
-## Run the checklist
-
-Begin by recording the phone model, Android version, build 11, date and whether this is a first install or update. Use the self-authored samples first.
+Use Samsung Z Fold7 / Android 17. Record the APK build and test date. Use sample books first.
 
 | ID | Action | Expected result |
 |---|---|---|
-| UAT-01 | Launch Readle and choose Add sample books. | Both PDF and EPUB entries appear and can be selected. |
-| UAT-02 | Select the PDF book. Record the session count, return to Library, then select it again. | Inspecting the book preserves the session count. A fresh book has zero sessions. |
-| UAT-03 | Choose Start reading, or Start new session if sessions already exist. Record its label. Navigate to PDF page 2, which contains the equation. | The reader shows the original page and reports Page 2 of 3. |
-| UAT-04 | Long-press a word until selection appears, adjust its endpoints, then choose Selection → Add note. Tap the Your note field, type `UAT note A`, and Save. | Notes lists the selected quote and the note you typed. |
-| UAT-05 | Change PDF zoom using Zoom +/Zoom − or pinch. Return to Library and choose Start new session. Record this second label and navigate to page 3. Open Notes, verify the first note, then close the dialog. | The two sessions have independent positions. The note is shared within the book. |
-| UAT-06 | Open Android Settings → Apps → Readle → Force stop. Enable airplane mode. Reopen Readle, select the PDF and open each recorded session. | The first session returns to page 2 with its zoom/selection state. The second returns to page 3. The saved note remains available. |
-| UAT-07 | Return to Library and select the EPUB entry. Inspect its sessions, start one, open Contents and choose chapter 2. Change font size and add a highlight using the native selection menu. Force-stop and reopen that session. | Its list is independent of the PDF. Chapter, reading position, font preference and highlight restore correctly after reflow/restart. |
-| UAT-08 | From the Library screen choose Continue and open an existing session. | The same saved session opens at its saved passage. |
-| UAT-09 | In the PDF, select the start of a passage, choose Selection → Extend to next page, select its ending passage and save a highlight. | The annotation retains both original page locations and can be tapped on either page or opened from Notes → highlight → Open source. |
-| UAT-10 | Disable airplane mode. Choose Import books and multi-select the four files in Downloads/Readle-UAT. | The two valid sample formats are readable, the exact PDF copy is recognized as a duplicate, and the intentionally corrupt PDF fails independently. |
-| UAT-11 | Retry only the corrupt import. | Its failure remains isolated and the valid books, sessions and annotations remain available. |
-| UAT-12 | Install build 11 over the existing build 10 and reopen both sessions. | The update preserves books, session positions and annotations. Existing books, highlights, notes and both session positions must survive. |
+| B12-01 | Install over build 11. Open each pre-existing session and its Notes list. | Old source files, session IDs, page/chapter positions and notes remain available. Previously shared notes are retained as independent copies in those existing sessions. |
+| B12-02 | For both EPUB and PDF, create a new session for a book with old notes/highlights. | The new session opens at the beginning with no historical highlights, notes or selection. Notes has no old entries. Existing sessions still retain their work. |
+| B12-03 | Create a highlight/note in new session A. Create new session B for that book. Add a different note in B, then edit/delete the note in A. Force-stop and reopen both in airplane mode. | B starts blank. A and B retain only their own notes, locations and settings. Editing/deleting in A cannot affect B. |
+| B12-04 | In EPUB choose **Layout → Continuous scroll**. Long-press a word, drag the end handle down while the chapter scrolls beyond the initial screen, then Highlight or Note. Change text size, close and reopen the session. Also try **Layout → Pages** and reopen. | A range spanning multiple screens within a chapter is saved at the same original words. Its object actions work. The chosen layout and font size restore for that session. Selecting across separate chapters is not supported in this increment. |
+| B12-05 | In PDF, long-press a word. Short-tap a blank area outside the selected words, without choosing another word. Repeat beside an existing saved highlight. | Temporary blue selection/handles clear and Selection asks for a new passage. Saved gold highlights and notes remain. Tapping a gold highlight still opens its own object menu. |
+| B12-06 | Open PDF page 2. Fold/unfold repeatedly, rotate, change pages, then force-stop/reopen. | Exactly one original page is shown, fit to the current window width. No duplicate page surfaces or horizontal magnification appear. Page and vertical reading position remain resumable. |
+| B12-07 | In PDF choose **Open original**, select an installed local PDF viewer, inspect the file and return. | The chosen viewer gets the original PDF with temporary read access. Returning preserves the Readle session. If no PDF viewer is installed, Readle explains that one is needed. |
 
-Use Android's Force stop button for restart testing. Uninstalling Readle or clearing its storage removes the local library and sessions. Install updates over the existing app using the same signing identity.
-
-## Build 11 feedback checks
-
-Install this APK over your existing app by opening it in My Files, as you did for build 10. Choose Update when Android asks. Keep the installed app and its storage so the upgrade can retain your library.
-
-| ID | Action | Expected result |
-|---|---|---|
-| FB-01 | In both PDF and EPUB, tap a saved gold highlight, including one made in build 10. | A Highlight menu shows that quote and its attached note. It offers Add/Edit note, Copy quote, Share quote, Open source and Delete highlight. |
-| FB-02 | Edit an attached note, close the reader, force-stop and reopen it in airplane mode. Open a second session for the same book and tap that highlight. | The same single highlight has the edited note in both sessions. Its original words and both session positions are preserved. |
-| FB-03 | Copy a quote and paste it into a temporary note. Try Share quote and cancel the Android share sheet. Choose Delete highlight → Keep, then Delete highlight → Delete. | Copy contains the quote. Share contains the quote and book title. Keep preserves the object. Delete removes its highlight and attached note from both sessions. |
-| FB-04 | Pinch and double-tap the PDF, scroll both directions, then tap a highlight. Rotate and switch between the Z Fold7 cover and inner screens. Force-stop and reopen the session. | Zoom stays within limits, controls remain reachable, the highlight menu opens at the correct words, and page, zoom and horizontal/vertical position restore. |
-| FB-05 | In EPUB, change text size, rotate or unfold, then tap the same highlight. In PDF, tap an overlapping highlight and each half of a two-page highlight. | EPUB retains the original highlighted words. PDF offers a chooser for overlapping objects. Either page opens the same two-page object. |
-
-These checks are pending physical-device feedback for build 11. Build 10's accepted results are recorded separately in [the UAT results](UAT_RESULTS.md).
+PDF pinch zoom, full authoring/reflow and new cross-page PDF selections are deferred under the accepted EPUB-first scope. Existing two-page annotations remain accessible. AI/learning and native iOS integration retain their separate milestones.
 
 ## Send results
 
-Reply in this chat with the following details. Report blocked steps with the exact on-screen message. For failures, add reproduction steps and a screenshot of a sample book if possible.
-
 ```text
-Build: 11
-Phone model:
-Android version:
-Install method: USB / APK opened in Files
-First install or update:
-UAT-01: Pass / Fail / Blocked
-UAT-02: Pass / Fail / Blocked
-UAT-03: Pass / Fail / Blocked
-UAT-04: Pass / Fail / Blocked
-UAT-05: Pass / Fail / Blocked
-UAT-06: Pass / Fail / Blocked
-UAT-07: Pass / Fail / Blocked
-UAT-08: Pass / Fail / Blocked
-UAT-09: Pass / Fail / Blocked
-UAT-10: Pass / Fail / Blocked
-UAT-11: Pass / Fail / Blocked
-UAT-12: Pass / Fail / Blocked
-FB-01..05: Pass / Fail / Blocked
-Failure details:
+Build: 12
+Device: Samsung Z Fold7
+Android: 17
+Install: update over build 11
+Date:
+B12-01..07: Pass / Fail / Blocked, one result per item
+Failure details: steps, expected result, observed result, exact error
 ```
 
-The current supported inputs are text PDF and static UTF-8 EPUB, subject to the limits in READER_SPIKE_STATUS.md. Continuous cross-page dragging, EPUB search, PDF TOC extraction, shelves and full accessibility acceptance remain pending. Engineering, emulator and physical-device UAT results are recorded independently. The complete Phase A gate also requires native iOS integration and physical iOS evidence.
+Physical-device results are recorded separately from automated tests and emulator fold checks. The current export covers session annotations, not a complete library backup. Schema 2 cannot be opened by a schema-1 binary; rollback requires a compatible fix-forward build using the same signer and a higher version code.
