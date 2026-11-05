@@ -7,7 +7,7 @@ Updated 2026-11-05. Build 10 passed the product owner's Android UAT on Samsung Z
 - Application ID: `com.readle.uat`.
 - Version code: 11. Version name: `0.1.0-spike`. Minimum Android API: 24. Target: 36.
 - Private APK: `output/android/readle-uat-11.apk`, with embedded JavaScript bundle. It starts without Metro, a backend, an account or an AI key.
-- APK SHA-256: `b55d88d17ff8f85d740b8a8c7f07d30c931d1e4e0f9c78761965e0e8ca01ad35`.
+- APK SHA-256: `04789bac508fbc76236eda245b0f37e03a825dc766a4cf424c00fe967b69b326`.
 - Signing certificate SHA-256: `0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5`, unchanged from build 10.
 - SQLite remains at schema 1. Existing book/session/annotation IDs and anchors are retained. The new PDF horizontal offset defaults to zero for a build 10 session.
 - Keys and passwords remain outside the repository in the builder's private `~/.local/share/readle` directory.
@@ -29,11 +29,13 @@ Checks run on an isolated Pixel 7 Android API 36 arm64 emulator. Native tests us
 | SQLite/import persistence | 7 tests pass |
 | Real native reader interaction tests | 3 tests pass |
 | Standalone release build, APK version and signer verification | Pass |
-| PDF double-tap, tap saved object after zoom, edit and confirmed delete | Pass in native interaction test |
+| PDF double-tap, both scroll axes restored after reader recreation, tap/edit/delete | Pass in native interaction test |
 | PDF pinch commit and per-highlight accessibility action | Pass in native interaction test |
 | EPUB saved highlight tap, font reflow, copy action and reopen | Pass in native interaction test |
 | Original source anchor and single annotation identity after edit | Pass |
 | Wrong-book/stale edits rejected, deleted selection cleared across sessions | Pass |
+| Existing v10 session entries (pages 2/3), EPUB chapter 2 and old note survive v11 install | Pass on emulator |
+| PDF controls and page fit after widening window to 1768 px | Pass on emulator; physical fold transitions pending |
 | Build 11 physical Z Fold7 feedback and v10→v11 update | Pending |
 | Native iOS reader and physical iOS/iPadOS verification | Pending |
 | Full assistive-technology journeys and named-hardware performance | Pending |

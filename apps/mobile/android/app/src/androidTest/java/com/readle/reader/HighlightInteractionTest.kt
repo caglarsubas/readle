@@ -124,6 +124,23 @@ class HighlightInteractionTest {
         val originalLocator = database.annotation(bookId, annotationId)!!.getString("locator")
         doubleTap()
         waitUntil { zoom() > 1.5 }
+        waitForPdfPage()
+        scenario!!.onActivity {
+            findView(it.window.decorView, PdfViewport::class.java)!!.scrollTo(201, 0)
+            findView(it.window.decorView, android.widget.ScrollView::class.java)!!.scrollTo(0, 303)
+        }
+        scenario!!.recreate()
+        waitForPdfPage()
+        waitUntil {
+            var restored = false
+            scenario!!.onActivity {
+                restored =
+                    findView(it.window.decorView, PdfViewport::class.java)!!.scrollX == 201 &&
+                        findView(it.window.decorView, android.widget.ScrollView::class.java)!!
+                            .scrollY == 303
+            }
+            restored
+        }
         tapHighlight()
         click("Edit note")
         val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }

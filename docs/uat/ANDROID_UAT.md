@@ -2,7 +2,7 @@
 
 The product owner is the Android UAT tester. Build 11 is a standalone, privately supplied APK, about 60 MiB, for Android 7.0/API 24 or newer. Its application ID is `com.readle.uat`, and it appears as Readle in the app list. It runs independently after installation. The current build covers the original reader and saved sessions. AI, courses and quizzes are later milestones.
 
-The APK is in `output/android/readle-uat-11.apk` on the build Mac. This is a local file path. The public Git repository contains the source and instructions. The current APK is supplied separately from this workspace. Its SHA-256 is `b55d88d17ff8f85d740b8a8c7f07d30c931d1e4e0f9c78761965e0e8ca01ad35`.
+The APK is in `output/android/readle-uat-11.apk` on the build Mac. This is a local file path. The public Git repository contains the source and instructions. The current APK is supplied separately from this workspace. Its SHA-256 is `04789bac508fbc76236eda245b0f37e03a825dc766a4cf424c00fe967b69b326`.
 
 ## Install from the development Mac by USB
 

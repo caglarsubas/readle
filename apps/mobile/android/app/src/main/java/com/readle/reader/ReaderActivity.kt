@@ -457,8 +457,8 @@ class ReaderActivity : AppCompatActivity() {
             vertical.setOnScrollChangeListener { _, _, _, _, _ -> persistPdfPosition() }
             horizontal.setOnScrollChangeListener { _, _, _, _, _ -> persistPdfPosition() }
             vertical.post {
-                horizontal.scrollTo((offsetX * view.width).toInt(), 0)
-                vertical.scrollTo(0, (offsetY * view.height).toInt())
+                horizontal.scrollTo((offsetX * view.width).roundToInt(), 0)
+                vertical.scrollTo(0, (offsetY * view.height).roundToInt())
                 persistPdfPosition()
             }
             status.text = "Page ${index + 1} of ${renderer.pageCount} · Saved on device"
