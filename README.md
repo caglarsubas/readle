@@ -14,10 +14,14 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 1
+./scripts/build-android.sh 11
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-1.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-10.apk`.
+
+## Install the current Android UAT build
+
+Build 10 is the current private handoff. With one authorized Android phone connected by USB, run `./scripts/install-android-uat.sh 10` from the repository root. The installer verifies the APK checksum, retains existing app data, copies the import-test fixtures and opens Readle. See [the phone setup and UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a build number higher than 10 for the next update.
 
 ## Try it
 
