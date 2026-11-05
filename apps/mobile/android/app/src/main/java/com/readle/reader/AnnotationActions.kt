@@ -16,11 +16,12 @@ class AnnotationActions(
     private val activity: AppCompatActivity,
     private val database: LibraryDatabase,
     private val book: JSONObject,
+    private val sessionId: String,
     private val onChanged: (JSONObject, Boolean) -> Unit,
     private val onOpenSource: (JSONObject) -> Unit,
 ) {
     fun show(ids: List<String>) {
-        val rows = ids.distinct().mapNotNull { database.annotation(book.getString("id"), it) }
+        val rows = ids.distinct().mapNotNull { database.annotation(sessionId, it) }
         if (rows.isEmpty()) return
         if (rows.size == 1) {
             showObject(rows.single())
@@ -123,7 +124,7 @@ class AnnotationActions(
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             try {
                 database.updateAnnotationNote(
-                    book.getString("id"),
+                    sessionId,
                     row.getString("id"),
                     row.getString("note"),
                     input.text.toString(),
@@ -143,7 +144,7 @@ class AnnotationActions(
             .setNegativeButton("Keep", null)
             .setPositiveButton("Delete") { _, _ ->
                 try {
-                    database.deleteAnnotation(book.getString("id"), row.getString("id"))
+                    database.deleteAnnotation(sessionId, row.getString("id"))
                     onChanged(row, true)
                 } catch (e: IllegalStateException) {
                     AlertDialog.Builder(activity)

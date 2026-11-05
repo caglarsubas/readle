@@ -1,57 +1,47 @@
-# Reader spike and highlight-action handoff
+# Build 12 reader handoff
 
-Updated 2026-11-05. Build 10 passed the product owner's Android UAT on Samsung Z Fold7 / Android 17. Build 11 addresses that feedback with saved highlight objects and PDF interaction improvements. Phase A remains open for native iOS and the remaining reader evidence. [User results and feedback](UAT_RESULTS.md).
+Updated 2026-11-05. Build 11 owner UAT rejected its PDF zoom/fold behavior and found missing deselection and cross-page selection. The owner changed the product to **blank independent sessions** and **EPUB-first reading/learning, with PDF source/reference**. [User results](UAT_RESULTS.md), [ADR 022](../adr/022-session-annotations.md), [ADR 023](../adr/023-epub-first.md).
 
-## Build 11
+## Build
 
 - Application ID: `com.readle.uat`.
-- Version code: 11. Version name: `0.1.0-spike`. Minimum Android API: 24. Target: 36.
-- Private APK: `output/android/readle-uat-11.apk`, with embedded JavaScript bundle. It starts without Metro, a backend, an account or an AI key.
-- APK SHA-256: `04789bac508fbc76236eda245b0f37e03a825dc766a4cf424c00fe967b69b326`.
-- Signing certificate SHA-256: `0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5`, unchanged from build 10.
-- SQLite remains at schema 1. Existing book/session/annotation IDs and anchors are retained. The new PDF horizontal offset defaults to zero for a build 10 session.
-- Keys and passwords remain outside the repository in the builder's private `~/.local/share/readle` directory.
+- Version code: 12. Version name: `0.1.0-spike`. Minimum API: 24. Target: 36.
+- Private standalone APK: `output/android/readle-uat-12.apk`. JavaScript is bundled; Metro, a backend and an AI key are unnecessary.
+- APK SHA-256: `0ef5dcac5b79494c1d69e01f1e0b853c01ae3395f3c8a1b2b5c1b51cb9ef18c1`.
+- Signing certificate SHA-256: `0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5`, unchanged from builds 10/11.
+- SQLite schema: 2, with transactional schema-1 migration. Existing sessions/reading state are retained; legacy book-shared annotations become independent copies in each existing session, with origin lineage. Orphaned legacy annotations get a recovery session. Future sessions start empty.
 
-## Feedback implementation
+## Current behavior
 
-A saved gold highlight can be tapped in PDF and EPUB. The same object menu is available through Notes. It shows the quote/note and offers Add/Edit note, Copy quote, Share quote, Open source and confirmed Delete. Editing updates the existing object without changing its anchor. Writes are scoped to book and edition, with stale-note detection that keeps the current editor draft. Deletion clears matching saved selections across the book's sessions while retaining their reading cursors and background last-activity order. PDF overlapping objects get a chooser and either half of a two-page annotation resolves the same ID.
+EPUB is listed first and labelled Reader. New sessions use continuous scroll, permitting selections beyond the initial screen within a chapter. Layout can switch to Pages and is saved independently, alongside font size and source locators. Rendered annotations, note lists, exports and object actions all require the owning session.
 
-PDF now supports pinch preview/commit and double-tap zoom, clearer Zoom controls, fit to the actual reading-window width, and persisted horizontal/vertical offsets. Toolbar buttons use equal widths and 48 dp minimum height. The source PDF's typography and layout remain original. EPUB retains native Readium selection and reflow.
+PDF is labelled Source/reference. The page always fits the window width, with one persistent native page surface per activity. Resize work is coalesced and stale restore callbacks are ignored. Folding does not stack replacement views. Bitmap opacity resets for every repaint. A short tap outside a temporary selected word clears the selection and saved selection state without deleting gold highlights. Open original grants temporary read access to a local Android PDF viewer chosen by the reader. In-app coordinate magnification and cross-page PDF authoring are removed from this MVP scope. Existing multi-page annotations remain viewable.
 
 ## Local engineering evidence
 
-Checks run on an isolated Pixel 7 Android API 36 arm64 emulator. Native tests use separate storage fixtures or uniquely identified temporary publications, with cleanup scoped to those fixtures. This is independent of the owner's physical-device UAT.
-
 | Check | Result |
 |---|---|
-| TypeScript and ESLint | Pass |
-| React Native session UI regressions | 3 tests pass |
-| SQLite/import persistence | 7 tests pass |
-| Real native reader interaction tests | 3 tests pass |
-| Standalone release build, APK version and signer verification | Pass |
-| PDF double-tap, both scroll axes restored after reader recreation, tap/edit/delete | Pass in native interaction test |
-| PDF pinch commit and per-highlight accessibility action | Pass in native interaction test |
-| EPUB saved highlight tap, font reflow, copy action and reopen | Pass in native interaction test |
-| Original source anchor and single annotation identity after edit | Pass |
-| Wrong-book/stale edits rejected, deleted selection cleared across sessions | Pass |
-| Existing v10 session entries (pages 2/3), EPUB chapter 2 and old note survive v11 install | Pass on emulator |
-| PDF controls and page fit after widening window to 1768 px | Pass on emulator; physical fold transitions pending |
-| Build 11 physical Z Fold7 feedback and v10→v11 update | Pending |
-| Native iOS reader and physical iOS/iPadOS verification | Pending |
-| Full assistive-technology journeys and named-hardware performance | Pending |
+| TypeScript / ESLint | Pass |
+| React Native session UI tests | 3 pass |
+| SQLite/import persistence and scope tests | 7 pass |
+| Real schema-1 migration / orphan recovery tests | 2 pass |
+| Native reader interaction tests on Pixel Fold API 36 arm64 | 4 pass |
+| Signed standalone release / same-signer verification | Pass |
+| Existing build-11 Pixel 7 AVD upgraded in place | Existing page-2/page-3 sessions and old notes retained; a new session opens at page 1 with an empty notes list |
+| EPUB tap/edit menu, font reflow, reopen | Pass |
+| Multi-screen EPUB range and blank-session isolation | Pass: DOM range longer than viewport saved via the real Selection → Highlight menu, original source anchor restored; a second session has no rendered annotations |
+| PDF real long-press then outside short tap | Pass: selection persisted, then cleared without replacement |
+| PDF content resize / one surface / accessibility action | Pass |
+| Repeated fold/unfold on dedicated Pixel Fold AVD | Pass: three fold/unfold cycles, seven observations, always one page-2 surface; widths 1080/2208 px. Keyguard dismissed after posture changes. Physical Z Fold7 gate remains pending |
+| Build 12 physical upgrade / cross-screen handle dragging / Z Fold7 folding | Pending owner UAT |
+| Native iOS / physical iOS and iPadOS | Pending |
 
-The new EPUB touch test caught registration before fragment attachment and a JavaBridge-thread UI call. The listener now registers after attachment and dispatches object UI to the main thread. CI builds the release app and compiles the native test APK; instrumentation executes locally on the emulator.
+The multi-screen automated EPUB test constructs a standard WebView selection and uses the reader's actual action and persistence paths. It does not substitute for physical handle dragging. Cross-chapter selection across separate EPUB spine resources remains open. CI builds the release APK and compiles native tests; instrumentation executes on the local AVD.
 
-Build 10's engineering baseline also verified independent PDF sessions at pages 2 and 3, force-stop/airplane-mode restoration, shared book notes, EPUB chapter restoration through an in-place APK update, isolated import failure/retry and missing-source repair through exact reimport. Build 10 was installed by the owner by downloading/opening its APK. The owner then reported all test items passed. See the separate user report for its scope and the new build's pending acceptance.
+## Scope and remaining evidence
 
-## Remaining work and rollback
+Phase A remains open for native iOS EPUB integration and physical evidence. Shelves, bookmarks, EPUB exact search, full accessibility, large-book performance and the expanded eight-file corpus remain open. PDF advanced authoring/reflow is optional P1; future PDF-to-learning conversion must preserve source mapping, equations, figures and reading order before use. AI, model switching, conversion, learning, assessment, research, backend and sync retain their revised milestone gates.
 
-The initial Android reader supports original text PDF and static UTF-8 EPUB, with 128 MiB file/expanded-archive limits, 4096 archive entries and an 8 MiB per-markup/CSS resource limit. Scripted, DTD-bearing, encrypted and externally embedded EPUB resources are rejected. The self-authored CC0 corpus remains the initial fixture set.
+Supported intake remains unencrypted text PDF and static UTF-8 EPUB, with 128 MiB file/expanded limits, 4096 archive entries and 8 MiB per markup/CSS resource. Source hashes and files are preserved. The self-authored sample corpus is CC0. Dependencies were unchanged; the previous audit baseline had 12 moderate advisories requiring production triage, with no high/critical findings at that earlier audit.
 
-Two-page PDF selection uses the explicit Extend to next page action. Continuous cross-page dragging, EPUB exact search, PDF contents extraction, manual bookmarks, shelves, comprehensive accessibility alternatives and large-book performance remain open. Full Xcode is required for native iOS integration. Android build 11 cover/inner-display behavior and performance require physical evidence.
-
-AI, BYOK/model switching, conversion, learning passes, assessments/recovery, research, comparison, backend APIs and sync retain their planned milestone gates. B01a is a bounded Android feedback increment, not full Phase B acceptance.
-
-The production JavaScript dependency audit baseline reports 12 moderate advisories and zero high/critical findings. Dependencies were unchanged in this increment; triage is required before production release. Build tooling uses Java 21, SDK 36, NDK 27.1.12297006, CMake 3.22.1 and the pinned npm peer-resolution mode.
-
-To roll back code without discarding local data, rebuild the previous source with the same signer and a higher version code. Keep the installed app and its storage. An uninstall removes sandboxed books and sessions; annotation JSON export does not back up the full library. Future schema changes require migrations and explicit upgrade-retention evidence. Preserve signing-key backups separately from the APK.
+Rollback uses a schema-2-compatible fix-forward build and a higher version code. Preserve the private signing identity outside Git. Annotation export does not back up complete books/sessions. Physical results and unresolved limitations remain separate from green local tests and CI.

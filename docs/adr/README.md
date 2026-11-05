@@ -5,7 +5,7 @@ The following index covers spec section 16. `accepted` identifies a bounded impl
 | ID | Topic | State |
 |---|---|---|
 | 001 | Reader SDK bridge and native PDF geometry | Spike, see 001-reader.md |
-| 002 | Anonymous local reading and SQLite sessions | Accepted for Android spike |
+| 002 | Anonymous local reading and SQLite sessions | Accepted; annotation scope superseded by 022 |
 | 003 | Device-only BYOK and explicit vault delegation | Planned before C |
 | 004 | Capability-validated course authoring provider | Planned before D |
 | 005 | On-prem protocol and actual engine discovery | Planned before C |
@@ -25,5 +25,7 @@ The following index covers spec section 16. `accepted` identifies a bounded impl
 | 019 | Passage overlap and evidence independence | Planned before E3 |
 | 020 | Qualified claims, review and abstention | Planned before E3 |
 | 021 | Opt-in comparative course snapshots | Planned before E3 |
+| [022](022-session-annotations.md) | Session-owned annotations and schema-1 migration | Accepted from build 11 UAT |
+| [023](023-epub-first.md) | EPUB-first reader, PDF source/reference | Accepted from build 11 UAT |
 
-The v1.3 model-switch contract is part of decisions 003, 005, 012 and 013. Saved-session state is part of decisions 002 and 006. Android UAT uses a stable signing identity and app ID with incremental build numbers.
+The v1.3 model-switch contract is part of decisions 003, 005, 012 and 013. Saved-session state is part of decisions 002 and 006, with annotation isolation in 022. Android UAT uses a stable signing identity and app ID with incremental build numbers.

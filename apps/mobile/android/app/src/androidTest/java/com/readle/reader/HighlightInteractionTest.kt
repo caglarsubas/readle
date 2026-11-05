@@ -72,7 +72,7 @@ class HighlightInteractionTest {
         sessionId = database.createSession(bookId).getString("id")
         annotationId =
             database.annotate(
-                bookId,
+                sessionId,
                 locator,
                 "A stable anchor identifies the passage",
                 "Original UI note",
@@ -119,28 +119,9 @@ class HighlightInteractionTest {
     }
 
     @Test
-    fun tapHighlightAfterZoomEditsAndDeletesTheSameObject() {
+    fun pdfHighlightEditsAndDeletesTheSameSessionObject() {
         launchPdf()
-        val originalLocator = database.annotation(bookId, annotationId)!!.getString("locator")
-        doubleTap()
-        waitUntil { zoom() > 1.5 }
-        waitForPdfPage()
-        scenario!!.onActivity {
-            findView(it.window.decorView, PdfViewport::class.java)!!.scrollTo(201, 0)
-            findView(it.window.decorView, android.widget.ScrollView::class.java)!!.scrollTo(0, 303)
-        }
-        scenario!!.recreate()
-        waitForPdfPage()
-        waitUntil {
-            var restored = false
-            scenario!!.onActivity {
-                restored =
-                    findView(it.window.decorView, PdfViewport::class.java)!!.scrollX == 201 &&
-                        findView(it.window.decorView, android.widget.ScrollView::class.java)!!
-                            .scrollY == 303
-            }
-            restored
-        }
+        val originalLocator = database.annotation(sessionId, annotationId)!!.getString("locator")
         tapHighlight()
         click("Edit note")
         val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }
@@ -155,17 +136,17 @@ class HighlightInteractionTest {
         )
         click("Save")
         waitUntil {
-            database.annotation(bookId, annotationId)?.getString("note") == "Edited from object"
+            database.annotation(sessionId, annotationId)?.getString("note") == "Edited from object"
         }
         assertEquals(
             originalLocator,
-            database.annotation(bookId, annotationId)!!.getString("locator"),
+            database.annotation(sessionId, annotationId)!!.getString("locator"),
         )
-        assertEquals(1, database.annotations(bookId).length())
+        assertEquals(1, database.annotations(sessionId).length())
         tapHighlight()
         click("Delete highlight")
         click("Delete")
-        waitUntil { database.annotation(bookId, annotationId) == null }
+        waitUntil { database.annotation(sessionId, annotationId) == null }
         assertEquals(
             0,
             JSONObject(database.session(sessionId).getString("state"))
@@ -175,72 +156,78 @@ class HighlightInteractionTest {
     }
 
     @Test
-    fun pinchCommitsZoomAndAccessibilityCanActivateSavedObject() {
+    fun pdfSelectionClearsOnOutsideTapAndFitsOneSurfaceAfterResize() {
         launchPdf()
-        scenario!!.onActivity { activity ->
-            val viewport = findView(activity.window.decorView, PdfViewport::class.java)!!
-            val time = SystemClock.uptimeMillis()
-            fun event(action: Int, elapsed: Long, positions: List<Pair<Float, Float>>) {
-                val properties =
-                    positions.indices
-                        .map { index ->
-                            MotionEvent.PointerProperties().apply {
-                                id = index
-                                toolType = MotionEvent.TOOL_TYPE_FINGER
-                            }
-                        }
-                        .toTypedArray()
-                val coordinates =
-                    positions
-                        .map { (x, y) ->
-                            MotionEvent.PointerCoords().apply {
-                                this.x = x
-                                this.y = y
-                                pressure = 1f
-                                size = 1f
-                            }
-                        }
-                        .toTypedArray()
-                val input =
-                    MotionEvent.obtain(
-                        time,
-                        time + elapsed,
-                        action,
-                        positions.size,
-                        properties,
-                        coordinates,
-                        0,
-                        0,
-                        1f,
-                        1f,
-                        0,
-                        0,
-                        android.view.InputDevice.SOURCE_TOUCHSCREEN,
-                        0,
-                    )
-                viewport.dispatchTouchEvent(input)
-                input.recycle()
-            }
-            event(MotionEvent.ACTION_DOWN, 0, listOf(100f to 300f))
-            event(
-                MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-                30,
-                listOf(100f to 300f, 400f to 300f),
-            )
-            event(MotionEvent.ACTION_MOVE, 70, listOf(90f to 300f, 440f to 300f))
-            event(MotionEvent.ACTION_MOVE, 110, listOf(80f to 300f, 530f to 300f))
-            event(MotionEvent.ACTION_MOVE, 150, listOf(70f to 300f, 620f to 300f))
-            event(
-                MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-                190,
-                listOf(70f to 300f, 620f to 300f),
-            )
-            event(MotionEvent.ACTION_UP, 210, listOf(70f to 300f))
-        }
-        waitUntil { zoom() > 1.1 }
+        var pageIdentity: PdfPageView? = null
         scenario!!.onActivity { activity ->
             val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            pageIdentity = page
+            assertEquals((page.parent as View).width, page.width)
+            val time = SystemClock.uptimeMillis()
+            val input =
+                MotionEvent.obtain(
+                    time,
+                    time,
+                    MotionEvent.ACTION_DOWN,
+                    page.width * 100f / 432f,
+                    page.height * 124f / 648f,
+                    0,
+                )
+            page.dispatchTouchEvent(input)
+            input.recycle()
+        }
+        SystemClock.sleep(650)
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val time = SystemClock.uptimeMillis()
+            val input =
+                MotionEvent.obtain(
+                    time - 650,
+                    time,
+                    MotionEvent.ACTION_UP,
+                    page.width * 100f / 432f,
+                    page.height * 124f / 648f,
+                    0,
+                )
+            page.dispatchTouchEvent(input)
+            input.recycle()
+        }
+        waitUntil {
+            !JSONObject(database.session(sessionId).getString("state")).isNull("selection")
+        }
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val time = SystemClock.uptimeMillis()
+            for ((action, elapsed) in
+                listOf(MotionEvent.ACTION_DOWN to 0L, MotionEvent.ACTION_UP to 30L)) {
+                val input =
+                    MotionEvent.obtain(time, time + elapsed, action, page.width * .9f, 20f, 0)
+                page.dispatchTouchEvent(input)
+                input.recycle()
+            }
+        }
+        waitUntil { JSONObject(database.session(sessionId).getString("state")).isNull("selection") }
+        // Exercise the same content-width callback used by a fold/unfold without depending on an
+        // AVD.
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val content = page.parent.parent as View
+            content.layoutParams.width = (content.width * .7f).toInt()
+            content.requestLayout()
+        }
+        waitUntil {
+            var fits = false
+            scenario!!.onActivity { activity ->
+                val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+                fits = page.width == (page.parent.parent as View).width
+            }
+            fits
+        }
+        scenario!!.onActivity { activity ->
+            assertSame(pageIdentity, findView(activity.window.decorView, PdfPageView::class.java))
+            assertEquals(1, countPages(activity.window.decorView))
             val info = AccessibilityNodeInfo.obtain()
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
             page.onInitializeAccessibilityNodeInfo(info)
             val action =
                 info.actionList.single {
@@ -250,7 +237,12 @@ class HighlightInteractionTest {
             info.recycle()
         }
         waitForNode { it.text?.toString() == "Copy quote" }
-        assertEquals(1, database.annotations(bookId).length())
+    }
+
+    private fun countPages(view: View): Int {
+        if (view is PdfPageView) return 1
+        if (view !is ViewGroup) return 0
+        return (0 until view.childCount).sumOf { countPages(view.getChildAt(it)) }
     }
 
     @Test
@@ -266,7 +258,7 @@ class HighlightInteractionTest {
                     JSONObject().put("highlight", "A stable anchor identifies the passage"),
                 ),
         )
-        val originalLocator = database.annotation(bookId, annotationId)!!.getString("locator")
+        val originalLocator = database.annotation(sessionId, annotationId)!!.getString("locator")
         tapEpubHighlight()
         click("Edit note")
         click("Cancel")
@@ -290,9 +282,94 @@ class HighlightInteractionTest {
         click("Keep")
         assertEquals(
             originalLocator,
-            database.annotation(bookId, annotationId)!!.getString("locator"),
+            database.annotation(sessionId, annotationId)!!.getString("locator"),
         )
-        assertEquals(1, database.annotations(bookId).length())
+        assertEquals(1, database.annotations(sessionId).length())
+    }
+
+    @Test
+    fun multiScreenEpubRangePersistsAndNewSessionStartsBlank() {
+        launchFixture(
+            "epub",
+            JSONObject()
+                .put("href", "EPUB/c0.xhtml")
+                .put("type", "application/xhtml+xml")
+                .put("locations", JSONObject().put("cssSelector", "html > body > p:nth-of-type(1)"))
+                .put(
+                    "text",
+                    JSONObject().put("highlight", "A stable anchor identifies the passage"),
+                ),
+        )
+        tapEpubHighlight()
+        click("Close")
+        database.deleteAnnotation(sessionId, annotationId)
+        val selected =
+            evaluateEpub(
+                """
+                (function() {
+                    const ps = document.querySelectorAll('p');
+                    const r = document.createRange();
+                    r.setStart(ps[0].firstChild, 2); r.setEnd(ps[5].firstChild, 38);
+                    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+                    return r.getBoundingClientRect().height > innerHeight;
+                })()
+                """
+                    .trimIndent()
+            )
+        assertEquals("true", selected)
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 1 }
+        val saved = database.annotations(sessionId).getJSONObject(0)
+        assertTrue(saved.getString("quote").length > 800)
+        val original = sessionId
+        scenario!!.close()
+        sessionId = database.createSession(bookId).getString("id")
+        scenario =
+            ActivityScenario.launch(
+                Intent(context, ReaderActivity::class.java).putExtra("sessionId", sessionId)
+            )
+        waitUntil { evaluateEpub("!!document.querySelector('p')") == "true" }
+        assertEquals(0, database.annotations(sessionId).length())
+        assertEquals(
+            "0",
+            evaluateEpub("document.querySelectorAll('[data-group=readle] [data-style]').length"),
+        )
+        scenario!!.close()
+        sessionId = original
+        scenario =
+            ActivityScenario.launch(
+                Intent(context, ReaderActivity::class.java).putExtra("sessionId", sessionId)
+            )
+        waitUntil {
+            evaluateEpub("document.querySelectorAll('[data-group=readle] [data-style]').length") ==
+                "1"
+        }
+        assertEquals(
+            saved.getString("locator"),
+            database.annotations(sessionId).getJSONObject(0).getString("locator"),
+        )
+        assertTrue(
+            JSONObject(database.session(sessionId).getString("state"))
+                .getJSONObject("preferences")
+                .getBoolean("epubScroll")
+        )
+    }
+
+    private fun evaluateEpub(script: String): String {
+        var value = "null"
+        val completed = CountDownLatch(1)
+        scenario!!.onActivity { activity ->
+            val web = findVisibleWebView(activity.window.decorView)
+            if (web == null) completed.countDown()
+            else
+                web.evaluateJavascript(script) {
+                    value = it
+                    completed.countDown()
+                }
+        }
+        assertTrue(completed.await(2, TimeUnit.SECONDS))
+        return value
     }
 
     private fun epubFontSize(): Double {
@@ -380,29 +457,6 @@ class HighlightInteractionTest {
         }
     }
 
-    private fun zoom() =
-        JSONObject(database.session(sessionId).getString("state"))
-            .getJSONObject("preferences")
-            .getDouble("pdfZoom")
-
-    private fun doubleTap() {
-        scenario!!.onActivity { activity ->
-            val viewport = findView(activity.window.decorView, PdfViewport::class.java)!!
-            val time = SystemClock.uptimeMillis()
-            for ((action, elapsed) in
-                listOf(
-                    MotionEvent.ACTION_DOWN to 0L,
-                    MotionEvent.ACTION_UP to 30L,
-                    MotionEvent.ACTION_DOWN to 120L,
-                    MotionEvent.ACTION_UP to 150L,
-                )) {
-                val event = MotionEvent.obtain(time, time + elapsed, action, 350f, 350f, 0)
-                viewport.dispatchTouchEvent(event)
-                event.recycle()
-            }
-        }
-    }
-
     private fun tapHighlight() {
         waitForPdfPage()
         instrumentation.waitForIdleSync()
@@ -426,14 +480,40 @@ class HighlightInteractionTest {
 
     private fun click(label: String) {
         instrumentation.waitForIdleSync()
+        val bounds = android.graphics.Rect()
         waitUntil {
-            var node =
+            val node =
                 findNode(instrumentation.uiAutomation.rootInActiveWindow) {
-                    it.text?.toString()?.equals(label, ignoreCase = true) == true
+                    it.text?.toString()?.equals(label, ignoreCase = true) == true &&
+                        it.isVisibleToUser
                 }
-            while (node != null && !node.isClickable && node.parent != null) node = node.parent
-            node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+            node?.getBoundsInScreen(bounds)
+            node != null && !bounds.isEmpty
         }
+        val time = SystemClock.uptimeMillis()
+        val down =
+            MotionEvent.obtain(
+                time,
+                time,
+                MotionEvent.ACTION_DOWN,
+                bounds.exactCenterX(),
+                bounds.exactCenterY(),
+                0,
+            )
+        instrumentation.sendPointerSync(down)
+        down.recycle()
+        SystemClock.sleep(50)
+        val up =
+            MotionEvent.obtain(
+                time,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP,
+                bounds.exactCenterX(),
+                bounds.exactCenterY(),
+                0,
+            )
+        instrumentation.sendPointerSync(up)
+        up.recycle()
         instrumentation.waitForIdleSync()
     }
 

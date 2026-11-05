@@ -138,11 +138,11 @@ function LibraryScreen() {
               <Text style={styles.link}>‹ Library</Text>
             </Pressable>
             <Text style={styles.eyebrow}>
-              {selected.format.toUpperCase()} · STORED ON THIS DEVICE
+              {selected.format === 'pdf' ? 'PDF SOURCE' : 'EPUB READER'} · STORED ON THIS DEVICE
             </Text>
             <Text style={styles.heading}>{selected.title}</Text>
             <Text style={styles.body}>
-              Pick up a session or begin somewhere new.
+              Resume your work, or start with a blank workspace.
             </Text>
             {!busy && (
               <View style={styles.actions}>
@@ -226,7 +226,7 @@ function LibraryScreen() {
                       Make room for a good idea.
                     </Text>
                     <Text style={styles.body}>
-                      Import a PDF or EPUB, or try the original Readle sample.
+                      Import an EPUB to read, or a PDF to keep as an original source.
                       Everything in this build stays on your device.
                     </Text>
                   </View>
@@ -255,7 +255,7 @@ function LibraryScreen() {
                     <View style={styles.grow}>
                       <Text style={styles.rowTitle}>{book.title}</Text>
                       <Text style={styles.meta}>
-                        {book.format.toUpperCase()} · Available offline
+                        {book.format === 'pdf' ? 'PDF · Source/reference' : 'EPUB · Reader'} · Available offline
                       </Text>
                       <Text style={styles.link}>View sessions →</Text>
                     </View>
@@ -322,7 +322,7 @@ function LibraryScreen() {
           </Text>
         )}
         <Text style={styles.footer}>
-          Read and annotate offline. Learning and AI arrive in later milestones.
+          Each new session starts without notes or highlights from other sessions.
         </Text>
       </ScrollView>
     </SafeAreaView>
