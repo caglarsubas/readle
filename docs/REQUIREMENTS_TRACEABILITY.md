@@ -47,7 +47,7 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | CITE-007 | preview permission/caching | C/E2 | Planned in milestone | Planned |
 | CITE-008 | edition mismatch handling | C/E2 | Planned in milestone | Planned |
 | READ-001 | EPUB primary reader; PDF source/reference | A/B/P1 | ReaderActivity single PDF surface; EPUB reflow/layout tests; ADR 023 | Partial, Android; full PDF authoring deferred |
-| SEL-001 | EPUB cross-screen selection and PDF transient selection | A/B | Multi-screen EPUB range/reopen test; PDF long-press/outside-tap clear test | Partial; cross-chapter EPUB ranges open |
+| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024; native swipe, end/start handle drags, release-stop and source restoration tests on Pixel 7 / Fold | Local pass; physical build-13 gestures and cross-chapter ranges open |
 | ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests | Partial, Android build 12; physical follow-up pending |
 | BOOKMARK-001 | flags/resume | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | AI-001 | contextual chat | C | Planned in milestone | Planned |
@@ -89,3 +89,5 @@ Backend `/v1/books/{id}/sessions` and session update endpoints are planned. The 
 Build 10: the product owner reported all Android checklist items passed on Samsung Z Fold7 / Android 17 on 2026-11-05. Build 11 addresses saved-highlight actions and PDF ergonomics. See [UAT results](uat/UAT_RESULTS.md) for the distinction between user reports, local tests and pending physical/iOS evidence.
 
 Build 11 owner UAT changes the original scope: annotations belong to sessions, new sessions are blank, EPUB is the primary reading/learning format, and PDF is an original-source reference view. [ADR 022](adr/022-session-annotations.md) and [ADR 023](adr/023-epub-first.md) supersede conflicting earlier requirements; the original 77 IDs plus SESSION-001/002 remain tracked.
+
+Build 12 owner UAT accepts the remaining checklist items and identifies two EPUB gesture failures. Build 13 adds actual native gesture coverage and the pinned SDK correction in [ADR 024](adr/024-epub-selection-gestures.md). Programmatically constructing a DOM range remains storage evidence only, not gesture acceptance.

@@ -1,0 +1,25 @@
+--- a/src/main/java/org/readium/r2/navigator/R2BasicWebView.kt
++++ b/src/main/java/org/readium/r2/navigator/R2BasicWebView.kt
+@@ -192,6 +192,11 @@
+         // dragging the text selection handles.
+         // See https://github.com/readium/kotlin-toolkit/issues/325
+         if (isSelecting) {
++            // Keep the column guard, but let native handles/panning scroll the active text axis.
++            if (scrollMode) {
++                if (listener?.verticalText == true) super.onOverScrolled(scrollX, this.scrollY, clampedX, true)
++                else super.onOverScrolled(this.scrollX, scrollY, true, clampedY)
++            }
+             return
+         }
+ 
+@@ -634,7 +639,9 @@
+             customCallback,
+             callback2 = callback as? ActionMode.Callback2
+         )
+-        return parent.startActionModeForChild(this, wrapper, type)
++        return parent.startActionModeForChild(this, wrapper, type)?.let {
++            ReadleSelectionActionMode(it, this)
++        }
+     }
+ 
+     @RequiresApi(Build.VERSION_CODES.M)

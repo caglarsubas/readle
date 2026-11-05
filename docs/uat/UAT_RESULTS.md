@@ -32,19 +32,25 @@ Device remains Samsung Z Fold7 / Android 17. This is a user report, distinct fro
 | Format direction | Owner selected **EPUB-first; PDF for source/reference**. |
 | Decision | Do not mark build 11 reader acceptance complete. Apply B01b / ADR 022 and 023 in build 12. |
 
-## Build 12 — physical acceptance pending
+## Build 12 — owner feedback — 2026-11-05
 
 | Field | Recorded evidence |
 |---|---|
 | Intended device | Same Z Fold7 / Android 17 |
 | Installation | Update over build 11 using the same signer and application ID |
 | Expected | Blank new sessions, isolated annotations, preserved old work, EPUB continuous scroll/cross-screen ranges, PDF deselection and one fit-width source page through folding |
-| Observed on physical phone | Pending owner report for build 12 |
+| Observed on physical phone | Owner reports all other items passed. B12-01/02/03/05/06/07 accepted on that basis. B12-04 fails when trying to move the viewport with a native selection active. |
 | Checklist | B12-01..07 in [ANDROID_UAT.md](ANDROID_UAT.md) |
 | Engineering evidence | [READER_SPIKE_STATUS.md](READER_SPIKE_STATUS.md); emulator/automated checks remain separate from the physical record |
 
+## Build 13 — native EPUB selection gestures — physical acceptance pending
+
+The owner reports two outstanding interactions on Z Fold7 / Android 17: continuous layout must scroll while a word remains selected, and dragging a selection boundary to the left/right edge in paginated layout must turn the page while extending the same range. Other build-12 items are reported OK. Build-13 physical acceptance is pending.
+
+Build-12's previous automated multi-screen test created a DOM range, then exercised saving and reopening. It did not verify native handle dragging or scrolling while selected. Build 13 now passes those actual touch paths on Pixel 7 and Pixel Fold API 36 AVDs, including finger scrolling, downward handle auto-scroll, forward/backward page extension, rendered source restoration and stopping on release. All 20 local tests pass. Physical Z Fold7 acceptance is pending.
+
 ## Open evidence and rollback
 
-Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Physical Z Fold7 fold/unfold, native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending.
+Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Build-12 physical Z Fold7 fold/unfold was accepted in the owner report. Native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending. EPUB selection gesture acceptance remains open.
 
 Build 12 migrates SQLite schema 1 to 2. Previously shared annotations are preserved as independent copies in already-existing sessions. New sessions start empty. Existing source files and reading/session state are retained. Rollback requires a schema-2-compatible fix-forward APK with the same signer and a higher version code. Do not install a schema-1 build over this database. Uninstalling or clearing storage removes the local library; annotation export is not a full backup.
