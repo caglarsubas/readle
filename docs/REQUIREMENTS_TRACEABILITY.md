@@ -46,9 +46,9 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | CITE-006 | bibliographic discovery | C/E2 | Planned in milestone | Planned |
 | CITE-007 | preview permission/caching | C/E2 | Planned in milestone | Planned |
 | CITE-008 | edition mismatch handling | C/E2 | Planned in milestone | Planned |
-| READ-001 | PDF/EPUB | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
+| READ-001 | PDF/EPUB | A/B | ReaderActivity/PdfViewport; native pinch/double-tap and EPUB reopen tests; build 10 owner UAT | Partial, Android |
 | SEL-001 | selection toolbar | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
-| ANN-001 | highlights/notes | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
+| ANN-001 | highlights/notes and saved-object actions | A/B | AnnotationActions; LibraryPersistenceTest scoped/stale edit and delete; HighlightInteractionTest PDF/EPUB touch, reflow/reopen | Partial, Android build 11; physical follow-up pending |
 | BOOKMARK-001 | flags/resume | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | AI-001 | contextual chat | C | Planned in milestone | Planned |
 | AI-002 | BYOK provider registry | C | Planned in milestone | Planned |
@@ -79,9 +79,11 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | PRIV-001 | privacy/egress | B/C | Planned in milestone | Planned |
 | SEC-001 | secrets/auth | A/C/F | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | SYNC-001 | Offline conflict-safe multi-device sync | F | Planned in milestone | Planned |
-| A11Y-001 | Accessible interactions | A/B/F | Android reader/storage/importer; LibraryPersistenceTest | Partial |
+| A11Y-001 | Accessible interactions | A/B/F | Native object menus/notes list; PDF per-highlight accessibility actions tested | Partial; comprehensive assistive-technology acceptance open |
 | EVAL-001 | source validation and educational quality | D/E/F | Planned in milestone | Planned |
 | SESSION-001 | Per-book discover/create/list and global Continue | A/B | Android SQLite/LibraryModule/App; session isolation instrumentation | Partial, Android |
 | SESSION-002 | Independent durable workspace restoration | A/B/C/E/F | SQLite state and native locator restoration; persistence/CAS instrumentation | Partial, Android reader |
 
 Backend `/v1/books/{id}/sessions` and session update endpoints are planned. The working Android path is a local native bridge and requires no backend.
+
+Build 10: the product owner reported all Android checklist items passed on Samsung Z Fold7 / Android 17 on 2026-11-05. Build 11 addresses saved-highlight actions and PDF ergonomics. See [UAT results](uat/UAT_RESULTS.md) for the distinction between user reports, local tests and pending physical/iOS evidence.

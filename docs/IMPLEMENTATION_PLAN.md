@@ -1,6 +1,6 @@
 # Readle implementation plan
 
-Prepared 2026-11-04. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
+Prepared 2026-11-04, updated 2026-11-05. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
 
 ## Phase A — Reader spike — P0 — in progress
 
@@ -9,7 +9,7 @@ Prepared 2026-11-04. The v1.3 specification and the user's full-workspace sessio
 3. A03 Import multiple files with isolated status, exact-byte identity and item retry. Depends on A01. Accept when a corrupt file and duplicate preserve all other imported publications.
 4. A04 Deliver a standalone signed Android APK with sample books and UAT checklist. Depends on A02/A03. Record build ID, signer fingerprint, checksum, installation, restart and upgrade evidence.
 
-The Android spike may exercise early Phase B session behavior. Phase A remains open until both native platforms pass the acceptance gate. Broad AI-course work depends on that gate.
+Build 10 passed the product owner’s Android checklist on Samsung Z Fold7 / Android 17, reported 2026-11-05. The Android spike exercises early Phase B session behavior. Phase A remains open until both native platforms pass the acceptance gate. Broad AI-course work depends on that gate.
 
 ## Phase B — Offline library and sessions — P0
 
@@ -18,6 +18,23 @@ B01 Deliver Library, shelves, book details, exact search, dictionary actions, bo
 B02 Add an explicit Sessions list per book, Continue latest, Start new session and the global Continue list. Viewing a book creates no session. Store an immutable source-version reference, independent Read/Learn cursors, selection, visual state, quiz draft, detours and assistant state per session. Share annotations at book level and count committed assessments once. Restore only against the same edition or show a recovery action. Depends on A01/A02. Verify two independent sessions at different passages, a second book with isolated sessions, force-stop, offline restore and APK upgrade.
 
 B03 Complete the eight-file batch fixture matrix with revised, translated, corrupt, duplicate and OCR-poor files. Isolate cancellation/retry, show true progress and privacy/rights settings. Reading progress, learning coverage and mastery remain distinct. Depends on A03. User Android UAT records the session acceptance journey before B acceptance.
+
+B01a Address the first Android UAT feedback. Depends on Android A02 and existing B02 persistence. Make saved PDF/EPUB highlights actionable objects with Add/Edit note, Copy, Share, Open source and confirmed Delete. Keep the same annotation identity and anchor when editing, enforce book/edition scope and reject stale note writes. Clear deleted saved selections without moving other sessions or changing their last-activity order. Improve PDF pinch/double-tap zoom, fit to actual window width and restore both scroll axes. Accept with real PDF/EPUB touch tests, reflow/reopen, scoped edit/delete storage tests, v10→v11 upgrade retention and Z Fold7 feedback checks FB-01..05.
+
+### Current delivery status
+
+| Work item | Verification status | Remaining evidence |
+|---|---|---|
+| A01 | Android build, CI baseline, JS checks and SQLite tests verified | iOS reader build remains separate |
+| A02 | Build 10 Android UAT reported pass | Native iOS integration/physical verification, continuous PDF cross-page dragging, full accessibility and measured performance |
+| A03 | Four-file import, duplicate, corrupt retry and missing-source recovery verified | B03 expanded corpus |
+| A04 | Signed standalone build 10 installed and accepted by owner | Build 11 supplied for feedback and physical upgrade verification |
+| B01 | Partial Android reader, dictionary lookup, notes and export | Shelves, manual bookmarks, EPUB exact search and remaining B acceptance |
+| B01a | Build 11 implementation and local tests; physical feedback pending | FB-01..05 on Z Fold7 |
+| B02 | Android local independent reading workspaces verified; build 10 UAT reported pass | Full learning/chat restoration as those features arrive, server ownership/revisions and later sync |
+| B03 | Initial fixtures verified | Revised edition, translation, OCR-poor file and eight-file batch evidence |
+
+The next bounded work is the remaining offline-library behavior and expanded import corpus, alongside resolving the iOS reader prerequisite. C and later milestones retain their stated dependencies. See [the UAT results](uat/UAT_RESULTS.md) and [current build evidence](uat/READER_SPIKE_STATUS.md).
 
 ## Phase C — Source-grounded assistant and switching — P0
 

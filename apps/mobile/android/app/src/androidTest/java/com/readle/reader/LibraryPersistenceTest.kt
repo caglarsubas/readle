@@ -207,4 +207,69 @@ class LibraryPersistenceTest {
         )
         stored.delete()
     }
+
+    @Test
+    fun annotationEditPreservesIdentityAndRejectsStaleOrWrongBookWrites() {
+        val anchor = JSONObject().put("pageIndex", 1).put("quote", "The weighted average")
+        val id = db.annotate(bookId, anchor, "The weighted average", "Original note")
+        val before = db.annotation(bookId, id)!!
+        db.updateAnnotationNote(bookId, id, "Original note", "Revised note")
+        val after = db.annotation(bookId, id)!!
+        assertEquals("Revised note", after.getString("note"))
+        for (field in listOf("id", "sourceVersion", "locator", "quote", "createdAt")) {
+            assertEquals(before.get(field), after.get(field))
+        }
+        try {
+            db.updateAnnotationNote(bookId, id, "Original note", "Stale text")
+            fail("Stale edit accepted")
+        } catch (_: IllegalStateException) {}
+        val otherId = java.util.UUID.randomUUID().toString()
+        db.writableDatabase.insertOrThrow(
+            "books",
+            null,
+            ContentValues().apply {
+                put("id", otherId)
+                put("title", "Other source")
+                put("format", "pdf")
+                put("path", "other")
+                put("sourceVersion", otherId)
+            },
+        )
+        assertNull(db.annotation(otherId, id))
+        try {
+            db.updateAnnotationNote(otherId, id, "Revised note", "Wrong owner")
+            fail("Cross-book edit accepted")
+        } catch (_: IllegalStateException) {}
+        try {
+            db.deleteAnnotation(otherId, id)
+            fail("Cross-book deletion accepted")
+        } catch (_: IllegalStateException) {}
+        db.close()
+        db = LibraryDatabase(context, "readle-test.db")
+        assertEquals("Revised note", db.annotation(bookId, id)!!.getString("note"))
+        assertEquals(1, db.annotations(bookId).length())
+    }
+
+    @Test
+    fun deletingHighlightClearsOnlyMatchingSavedSelectionsAcrossSessions() {
+        val anchor = JSONObject().put("pageIndex", 1)
+        val id = db.annotate(bookId, anchor, "The weighted average", "Note")
+        val otherId = db.annotate(bookId, JSONObject().put("pageIndex", 2), "Independent", "Keep")
+        val first = db.createSession(bookId).getString("id")
+        val second = db.createSession(bookId).getString("id")
+        for (sessionId in listOf(first, second)) db.mutateSession(sessionId) {
+            it.put("selection", JSONObject().put("locator", anchor))
+            it.put("readingLocator", JSONObject().put("pageIndex", 2))
+        }
+        val previousTimestamp = db.session(second).getLong("updatedAt")
+        db.deleteAnnotation(bookId, id)
+        assertNull(db.annotation(bookId, id))
+        assertNotNull(db.annotation(bookId, otherId))
+        for (sessionId in listOf(first, second)) {
+            val state = JSONObject(db.session(sessionId).getString("state"))
+            assertTrue(state.isNull("selection"))
+            assertEquals(2, state.getJSONObject("readingLocator").getInt("pageIndex"))
+        }
+        assertEquals(previousTimestamp, db.session(second).getLong("updatedAt"))
+    }
 }

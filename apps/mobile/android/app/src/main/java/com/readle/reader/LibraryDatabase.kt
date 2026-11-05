@@ -154,12 +154,13 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
         updateSession(id, row.getInt("revision"), state)
     }
 
-    fun annotate(bookId: String, locator: JSONObject, quote: String, note: String) {
+    fun annotate(bookId: String, locator: JSONObject, quote: String, note: String): String {
+        val id = UUID.randomUUID().toString()
         writableDatabase.insertOrThrow(
             "annotations",
             null,
             ContentValues().apply {
-                put("id", UUID.randomUUID().toString())
+                put("id", id)
                 put("bookId", bookId)
                 put("sourceVersion", book(bookId).getString("sourceVersion"))
                 put("locator", locator.toString())
@@ -168,10 +169,61 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
                 put("createdAt", System.currentTimeMillis())
             },
         )
+        return id
     }
 
     fun annotations(bookId: String) =
         query("SELECT * FROM annotations WHERE bookId = ? ORDER BY createdAt", arrayOf(bookId))
+
+    fun annotation(bookId: String, id: String): JSONObject? =
+        query(
+                "SELECT * FROM annotations WHERE bookId = ? AND id = ? AND sourceVersion = ?",
+                arrayOf(bookId, id, book(bookId).getString("sourceVersion")),
+            )
+            .optJSONObject(0)
+
+    fun updateAnnotationNote(bookId: String, id: String, expectedNote: String, note: String) {
+        val changed =
+            writableDatabase.update(
+                "annotations",
+                ContentValues().apply { put("note", note) },
+                "bookId = ? AND id = ? AND sourceVersion = ? AND note = ?",
+                arrayOf(bookId, id, book(bookId).getString("sourceVersion"), expectedNote),
+            )
+        check(changed == 1) {
+            "This highlight changed or was removed. Reopen it to edit the latest note."
+        }
+    }
+
+    @Synchronized
+    fun deleteAnnotation(bookId: String, id: String) {
+        writableDatabase.beginTransaction()
+        try {
+            val row = annotation(bookId, id) ?: error("This highlight is no longer available.")
+            writableDatabase.delete("annotations", "bookId = ? AND id = ?", arrayOf(bookId, id))
+            val snapshots = query("SELECT * FROM sessions WHERE bookId = ?", arrayOf(bookId))
+            for (index in 0 until snapshots.length()) {
+                val session = snapshots.getJSONObject(index)
+                val state = JSONObject(session.getString("state"))
+                val selection = state.optJSONObject("selection")?.optJSONObject("locator")
+                if (selection?.toString() == row.getString("locator")) {
+                    state.put("selection", JSONObject.NULL)
+                    writableDatabase.update(
+                        "sessions",
+                        ContentValues().apply {
+                            put("state", state.toString())
+                            put("revision", session.getInt("revision") + 1)
+                        },
+                        "id = ?",
+                        arrayOf(session.getString("id")),
+                    )
+                }
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
 
     companion object {
         @Volatile private var instance: LibraryDatabase? = null
