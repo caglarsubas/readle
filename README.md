@@ -14,17 +14,17 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 11
+./scripts/build-android.sh 12
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-10.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-11.apk`.
 
 ## Install the current Android UAT build
 
-Build 10 is the current private handoff. With one authorized Android phone connected by USB, run `./scripts/install-android-uat.sh 10` from the repository root. The installer verifies the APK checksum, retains existing app data, copies the import-test fixtures and opens Readle. See [the phone setup and UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a build number higher than 10 for the next update.
+Build 11 is the current private handoff. Build 10 passed the product owner’s Android UAT on a Samsung Z Fold7 running Android 17. With one authorized Android phone connected by USB, run `./scripts/install-android-uat.sh 11` from the repository root. The installer verifies the APK checksum, retains existing app data, copies the import-test fixtures and opens Readle. See [the phone setup and UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a build number higher than 11 for the next update.
 
 ## Try it
 
-Open **Add sample books**, select either publication, and start reading. Navigate to a later page or chapter. Return to Library and start a second session. Force-stop and reopen, select that book, and choose either session. In PDF, long press text and drag a selection endpoint, then use **Selection** to highlight, note, copy, look up, or explicitly search Google. Use **Extend to next page** for a two-page selection. EPUB uses native Readium selection handles and its contextual Highlight/Note actions. **Notes** opens shared annotations and JSON export.
+Open **Add sample books**, select either publication, and start reading. Navigate to a later page or chapter. Return to Library and start a second session. Force-stop and reopen, select that book, and choose either session. In PDF, long press text and drag a selection endpoint, then use **Selection** to highlight, note, copy, look up, or explicitly search Google. Use **Extend to next page** for a two-page selection. EPUB uses native Readium selection handles and its contextual Highlight/Note actions. **Notes** opens shared annotations and JSON export. Tap a saved highlight in either format to edit its note, copy/share the quote, open its source or delete the object. PDF supports pinch and double-tap zoom, with saved horizontal and vertical offsets.
 
 See `docs/uat/ANDROID_UAT.md` for acceptance instructions and `docs/IMPLEMENTATION_PLAN.md` for the remaining milestones. The sample books are self-authored CC0 fixtures. Regenerate them with Python and ReportLab using `python scripts/generate_fixtures.py`.

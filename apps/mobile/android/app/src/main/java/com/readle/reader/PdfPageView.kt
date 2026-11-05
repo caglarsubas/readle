@@ -2,9 +2,12 @@ package com.readle.reader
 
 import android.content.Context
 import android.graphics.*
+import android.os.Bundle
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.PointerIcon
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import kotlin.math.abs
@@ -14,6 +17,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class Glyph(val text: String, val bounds: RectF)
+
+data class PdfHighlight(val id: String, val quote: String, val bounds: List<RectF>)
 
 class PositionedText : PDFTextStripper() {
     val glyphs = mutableListOf<Glyph>()
@@ -35,8 +40,11 @@ class PositionedText : PDFTextStripper() {
 }
 
 /** The bitmap remains the original publication. Selection geometry is in PDF page points. */
-class PdfPageView(context: Context, private val onSelection: (JSONObject, String) -> Unit) :
-    View(context) {
+class PdfPageView(
+    context: Context,
+    private val onSelection: (JSONObject, String) -> Unit,
+    private val onAnnotationTap: (List<String>) -> Unit,
+) : View(context) {
     private var bitmap: Bitmap? = null
     private var glyphs: List<Glyph> = emptyList()
     private var pageWidth = 1f
@@ -48,12 +56,19 @@ class PdfPageView(context: Context, private val onSelection: (JSONObject, String
     private var dragging = false
     var extendFromPageStart = false
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var savedQuads = listOf<RectF>()
+    private var highlights = listOf<PdfHighlight>()
     private val detector =
         GestureDetector(
             context,
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent) = true
+
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    val ids = highlightedObjectsAt(e.x, e.y)
+                    if (ids.isEmpty()) return false
+                    onAnnotationTap(ids)
+                    return true
+                }
 
                 override fun onLongPress(e: MotionEvent) {
                     val index = nearest(e.x, e.y)
@@ -73,18 +88,19 @@ class PdfPageView(context: Context, private val onSelection: (JSONObject, String
         width: Float,
         height: Float,
         text: List<Glyph>,
-        annotations: List<RectF>,
+        annotations: List<PdfHighlight>,
     ) {
         bitmap?.recycle()
         bitmap = image
         pageWidth = width
         pageHeight = height
         glyphs = text
-        savedQuads = annotations
+        highlights = annotations
         first = -1
         last = -1
         contentDescription =
-            "PDF page ${pageIndex + 1}. Long press text, then drag either selection handle."
+            "PDF page ${pageIndex + 1}. Tap a highlight for actions. Long press text to select."
+        isFocusable = true
         requestLayout()
         invalidate()
     }
@@ -119,7 +135,7 @@ class PdfPageView(context: Context, private val onSelection: (JSONObject, String
         canvas.save()
         canvas.scale(sx, sy)
         ink.color = Color.argb(90, 226, 192, 79)
-        savedQuads.forEach { canvas.drawRect(it, ink) }
+        highlights.forEach { highlight -> highlight.bounds.forEach { canvas.drawRect(it, ink) } }
         if (first >= 0 && last >= 0) {
             ink.color = Color.argb(100, 100, 155, 180)
             for (i in min(first, last)..max(first, last)) canvas.drawRect(glyphs[i].bounds, ink)
@@ -164,6 +180,51 @@ class PdfPageView(context: Context, private val onSelection: (JSONObject, String
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+
+    private fun highlightedObjectsAt(x: Float, y: Float): List<String> {
+        val px = x / width.coerceAtLeast(1) * pageWidth
+        val py = y / height.coerceAtLeast(1) * pageHeight
+        val tolerance = 8 * resources.displayMetrics.density * pageWidth / width.coerceAtLeast(1)
+        return highlights
+            .filter { highlight ->
+                highlight.bounds.any { bounds ->
+                    px >= bounds.left - tolerance &&
+                        px <= bounds.right + tolerance &&
+                        py >= bounds.top - tolerance &&
+                        py <= bounds.bottom + tolerance
+                }
+            }
+            .map { it.id }
+            .distinct()
+    }
+
+    override fun onResolvePointerIcon(event: MotionEvent, pointerIndex: Int): PointerIcon =
+        PointerIcon.getSystemIcon(
+            context,
+            if (highlightedObjectsAt(event.x, event.y).isEmpty()) PointerIcon.TYPE_TEXT
+            else PointerIcon.TYPE_HAND,
+        )
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        highlights.forEachIndexed { index, highlight ->
+            info.addAction(
+                AccessibilityNodeInfo.AccessibilityAction(
+                    ANNOTATION_ACTION_BASE + index,
+                    "Highlight ${highlight.quote.take(60)}",
+                )
+            )
+        }
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        val index = action - ANNOTATION_ACTION_BASE
+        if (index in highlights.indices) {
+            onAnnotationTap(listOf(highlights[index].id))
+            return true
+        }
+        return super.performAccessibilityAction(action, arguments)
     }
 
     private fun nearest(x: Float, y: Float): Int {
@@ -220,5 +281,9 @@ class PdfPageView(context: Context, private val onSelection: (JSONObject, String
     fun release() {
         bitmap?.recycle()
         bitmap = null
+    }
+
+    companion object {
+        private const val ANNOTATION_ACTION_BASE = 0x02000000
     }
 }

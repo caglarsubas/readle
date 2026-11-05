@@ -41,3 +41,6 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: npm ci --prefix apps/mobile
       - run: ./scripts/build-android.sh 1
+      - name: Compile native interaction and persistence tests
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleReleaseAndroidTest --console=plain
