@@ -1,0 +1,5 @@
+com.readle.reader.LibraryPersistenceTest:.....
+
+Time: 0.275
+
+OK (5 tests)
