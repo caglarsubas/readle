@@ -2,9 +2,9 @@
 
 Updated 2026-11-06. The Z Fold7 owner reported that build 13 extends selections forward but not backward, its two layouts feel alike, ordinary turns lose selections, annotation dialogs feel separate, Find is unavailable in EPUB, and the installed version is not visible. See [the owner record](UAT_RESULTS.md).
 
-- Standalone APK: \`output/android/readle-uat-14.apk\` (private). Application ID \`com.readle.uat\`, version \`0.1.0-spike\`, version code 14, min API 24, target 36.
-- APK SHA-256: \`16669e47244713a0cc30c78b64e4a6b57f935d25b26607c71b1c5284d80f548e\`.
-- Signer SHA-256: \`0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5\`, unchanged from build 13.
+- Standalone APK: `output/android/readle-uat-14.apk` (private). Application ID `com.readle.uat`, version `0.1.0-spike`, version code 14, min API 24, target 36.
+- APK SHA-256: `16669e47244713a0cc30c78b64e4a6b57f935d25b26607c71b1c5284d80f548e`.
+- Signer SHA-256: `0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5`, unchanged from build 13.
 - SQLite schema 2; no migration. Install with **Update** over build 13. Library → About shows the installed metadata.
 
 ## Reader changes
