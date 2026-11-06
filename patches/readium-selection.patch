@@ -75,7 +75,7 @@
          val isCancelled = (initialVelocity * currentVelocity) <= 0
 --- a/src/main/java/org/readium/r2/navigator/epub/EpubNavigatorFragment.kt
 +++ b/src/main/java/org/readium/r2/navigator/epub/EpubNavigatorFragment.kt
-@@ -701,6 +701,9 @@
+@@ -701,12 +701,15 @@
          inputListener.remove(listener)
      }
 
@@ -85,7 +85,32 @@
      // SelectableNavigator
 
      override suspend fun currentSelection(): Selection? {
-@@ -840,6 +843,10 @@
+         val fragment = currentReflowablePageFragment ?: return null
+         val json =
+-            fragment.runJavaScriptSuspend("readium.getCurrentSelection();")
++            fragment.runJavaScriptSuspend("window.__readleAnchors.capture();")
+                 .takeIf { it != "null" }
+                 ?.let { tryOrLog { JSONObject(it) } }
+                 ?: return null
+@@ -714,8 +717,16 @@
+         val rect = json.optRectF("rect")
+             ?.run { adjustedToViewport() }
+
++        val resourceLocator = fragment.link?.let { publication.locatorFromLink(it) }
++        val current = currentLocator.value
++        val locator = resourceLocator?.takeUnless { it.href == current.href } ?: current
++        val range = json.optJSONObject("readleRange")
+         return Selection(
+-            locator = currentLocator.value.copy(
++            locator = locator.copy(
++                locations = locator.locations.copy(
++                    otherLocations = if (range == null) locator.locations.otherLocations
++                        else locator.locations.otherLocations + ("readleRange" to range)
++                ),
+                 text = Locator.Text.fromJSON(json.optJSONObject("text"))
+             ),
+             rect = rect
+@@ -840,6 +851,10 @@
              return this@EpubNavigatorFragment.goToNextResource(jump = jump, animated = animated)
          }
 
@@ -96,7 +121,7 @@
          override val selectionActionModeCallback: ActionMode.Callback?
              get() = config.selectionActionModeCallback
 
-@@ -911,7 +918,17 @@
+@@ -911,7 +926,17 @@
              locatorToNextResource()?.let { listener?.onJumpToLocator(it) }
          }
 
@@ -115,7 +140,7 @@
 
          currentReflowablePageFragment?.webView?.let { webView ->
              if (settings.value.readingProgression == ReadingProgression.RTL) {
-@@ -933,7 +950,17 @@
+@@ -933,7 +958,17 @@
              locatorToPreviousResource()?.let { listener?.onJumpToLocator(it) }
          }
 

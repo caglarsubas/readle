@@ -12,3 +12,6 @@ The Readium BSD-3-Clause license is retained in source headers and copied into t
 
 
 Build 14 routes ordinary vertical scroll gestures to WebView, recognizes chapter-edge swipes on the vertical axis, and lets the app capture a selected source passage before an ordinary page turn. The handle monitor compares against the resting range and tolerates nearby inline boundaries. See [ADR 025](../../../docs/adr/025-reader-panels-and-page-navigation.md).
+
+
+New selections also store source node paths and offsets. Preparation adds the readable `patches/readium-selection-anchors.js` helper to the verified reflowable bundle and hooks its shared range resolver at one exact signature. The resolver verifies the original quote before rendering or navigating, and leaves legacy quote locators intact. Preparation fails if that pinned signature changes.

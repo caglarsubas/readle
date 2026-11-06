@@ -26,7 +26,7 @@ android {
 }
 
 def prepareReadium = tasks.register('prepareReadium', Exec) {
-    inputs.files(rootProject.file('../../../scripts/prepare_readium.py'), rootProject.file('../../../patches/readium-selection.patch'))
+    inputs.files(rootProject.file('../../../scripts/prepare_readium.py'), rootProject.file('../../../patches/readium-selection.patch'), rootProject.file('../../../patches/readium-selection-anchors.js'))
     outputs.dir(layout.buildDirectory.dir('upstream'))
     commandLine 'python3', rootProject.file('../../../scripts/prepare_readium.py'), layout.buildDirectory.dir('upstream').get().asFile
 }

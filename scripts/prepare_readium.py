@@ -12,8 +12,9 @@ COMMIT = '71074ea0c424eabbc39a93b48a4cefe366f7741b'
 SHA256 = '0fb071a8a9966eb41a22065e3a38d629502b38f1394e36f461cd0129835051ae'
 root = Path(__file__).resolve().parent.parent
 patch = root / 'patches/readium-selection.patch'
+anchors = root / 'patches/readium-selection-anchors.js'
 destination = Path(sys.argv[1]).resolve()
-fingerprint = COMMIT + hashlib.sha256(patch.read_bytes() + Path(__file__).read_bytes()).hexdigest()
+fingerprint = COMMIT + hashlib.sha256(patch.read_bytes() + anchors.read_bytes() + Path(__file__).read_bytes()).hexdigest()
 marker = destination / '.readle-source'
 if marker.exists() and marker.read_text() == fingerprint:
     sys.exit(0)
@@ -48,5 +49,14 @@ with tarfile.open(archive) as source:
     target = destination / 'src/main/assets/readle_readium_LICENSE.txt'
     target.write_bytes(license_file)
 subprocess.run(['patch', '-p1', '--batch', '--forward', '-i', str(patch)], cwd=destination, check=True)
+# Hook the shared locator resolver once, before the legacy quote matcher. The upstream
+# bundle is verified by the source archive hash; a changed signature fails preparation.
+bundle = destination / 'src/main/assets/readium/scripts/readium-reflowable.js'
+source = bundle.read_text()
+signature = 'function T(u){try{var t,e=u.locations,r=u.text;'
+if source.count(signature) != 1:
+    raise RuntimeError('Unexpected Readium locator resolver signature')
+hook = 'if(e&&e.readleRange)return window.__readleAnchors.resolve(u);'
+bundle.write_text(anchors.read_text() + '\n' + source.replace(signature, signature + hook, 1))
 marker.write_text(fingerprint)
 print('Prepared Readium 3.1.2 at ' + COMMIT)
