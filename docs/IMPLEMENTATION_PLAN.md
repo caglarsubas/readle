@@ -23,7 +23,9 @@ B01a Address the first Android UAT feedback. Depends on Android A02 and existing
 
 B01b Apply build 11 UAT. Depends on B02 and schema 2 migration. Isolate annotations by session; preserve old work during upgrade; add EPUB continuous scroll and session-owned layout choice; save a selection spanning more than one screen; clear PDF selection by outside tap; retain exactly one fit-width PDF page surface through folding; provide Open original for a local PDF viewer. Verify schema-1 upgrade/orphan recovery, scoped edit/delete, EPUB range/reopen/blank-session isolation, PDF long-press/deselect/resize and real fold/unfold emulator behavior. Physical Z Fold7 acceptance remains a separate gate.
 
-B01c Complete native EPUB selection gestures from build-12 UAT. Depends on B01b and the pinned navigator patch in ADR 024. Verify a real long-press selection survives finger scrolling in Continuous scroll, dragging an end handle turns forward, dragging a start handle turns backward, the opposite anchor remains fixed, page turning stops after release, and the saved range survives reopen. DOM-range-only tests are insufficient for this gate. Build 12's other UAT items are accepted by owner report; these gestures require build-13 physical acceptance.
+B01c Complete native EPUB selection gestures from build-12 UAT. Depends on B01b and the pinned navigator patch in ADR 024. Verify a real long-press selection survives finger scrolling in Continuous scroll, dragging an end handle turns forward, dragging a start handle turns backward, the opposite anchor remains fixed, page turning stops after release, and the saved range survives reopen. DOM-range-only tests are insufficient for this gate. Build 12's other UAT items are accepted by owner report. Build 13 forward extension passed on the Z Fold7, with the remaining reader defects tracked by B01d.
+
+B01d Address build-13 UAT. Depends on B01b/B01c. Show the installed Android version and build in About. Verify vertical scrolling and chapter transitions, horizontal page turns, both native handle directions and retaining the selected passage during page turns. Keep note and selection actions inside the reading view. Find EPUB text on device and open the matched source. Verify offline on emulators and repeat on Z Fold7 cover and inner screens. See ADR 025 and B14-01..07.
 
 ### Current delivery status
 
@@ -33,10 +35,11 @@ B01c Complete native EPUB selection gestures from build-12 UAT. Depends on B01b 
 | A02 | Build 10 Android UAT reported pass | Native iOS integration/physical verification, EPUB cross-screen selection on physical devices, full accessibility and measured performance |
 | A03 | Four-file import, duplicate, corrupt retry and missing-source recovery verified | B03 expanded corpus |
 | A04 | Signed standalone build 10 installed and accepted by owner | Build 12 supplied for feedback and physical upgrade verification |
-| B01 | Partial Android reader, dictionary lookup, notes and export | Shelves, manual bookmarks, EPUB exact search and remaining B acceptance |
+| B01 | Partial Android reader, dictionary lookup, notes and export | Shelves, manual bookmarks, EPUB search qualification and remaining B acceptance |
 | B01a | Build 11 locally verified; owner reported PDF/selection defects and changed session/format scope | Superseded by B01b |
 | B01b | Build 12 owner reports other items passed; native selection scrolling/page extension failed | Selection gestures carried by B01c |
-| B01c | Build 13 touch tests verified on Pixel 7 and Pixel Fold AVDs | Z Fold7 / Android 17 gesture acceptance |
+| B01c | Build 13 emulator tests passed; owner confirmed forward handle extension | Scroll, reverse extension and selection retention carried by B01d |
+| B01d | Build 14 reader and About changes | Z Fold7 / Android 17 acceptance, B14-01..07 |
 | B02 | Android local independent reading workspaces verified; build 10 UAT reported pass | Full learning/chat restoration as those features arrive, server ownership/revisions and later sync |
 | B03 | Initial fixtures verified | Revised edition, translation, OCR-poor file and eight-file batch evidence |
 

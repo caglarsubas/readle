@@ -43,11 +43,20 @@ Device remains Samsung Z Fold7 / Android 17. This is a user report, distinct fro
 | Checklist | B12-01..07 in [ANDROID_UAT.md](ANDROID_UAT.md) |
 | Engineering evidence | [READER_SPIKE_STATUS.md](READER_SPIKE_STATUS.md); emulator/automated checks remain separate from the physical record |
 
-## Build 13 — native EPUB selection gestures — physical acceptance pending
+## Build 13 — owner feedback — 2026-11-06
 
-The owner reports two outstanding interactions on Z Fold7 / Android 17: continuous layout must scroll while a word remains selected, and dragging a selection boundary to the left/right edge in paginated layout must turn the page while extending the same range. Other build-12 items are reported OK. Build-13 physical acceptance is pending.
+Device: Samsung Z Fold7 / Android 17, as previously reported. These are physical observations, separate from the build-13 Pixel 7 and Pixel Fold API 36 emulator passes.
 
-Build-12's previous automated multi-screen test created a DOM range, then exercised saving and reopening. It did not verify native handle dragging or scrolling while selected. Build 13 now passes those actual touch paths on Pixel 7 and Pixel Fold API 36 AVDs, including finger scrolling, downward handle auto-scroll, forward/backward page extension, rendered source restoration and stopping on release. All 20 local tests pass. Physical Z Fold7 acceptance is pending.
+| Topic | Owner observation / follow-up |
+|---|---|
+| About | No way to see which version is installed. Show the installed version and build number. |
+| EPUB layout | Continuous scroll and Pages both feel paginated. Make the gestures and chapter transitions distinct. |
+| Handle drag | Forward page extension works. Previous-page extension fails. Retest backward on both screens. |
+| Page turns with a selection | The selected passage is lost. Preserve it in the session when navigating away and back. |
+| Notes and selection | The dialogs feel separate from the app. Keep their controls and editing inside the reader. |
+| Find | EPUB shows a pending-spike message. Search the book on device and open matching passages. |
+
+Forward extension was reported working. The report does not establish a pass for the other build-13 checks. Build 14 addresses these observations under B01d; physical acceptance remains pending.
 
 ## Open evidence and rollback
 

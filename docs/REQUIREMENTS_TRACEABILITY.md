@@ -47,8 +47,8 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | CITE-007 | preview permission/caching | C/E2 | Planned in milestone | Planned |
 | CITE-008 | edition mismatch handling | C/E2 | Planned in milestone | Planned |
 | READ-001 | EPUB primary reader; PDF source/reference | A/B/P1 | ReaderActivity single PDF surface; EPUB reflow/layout tests; ADR 023 | Partial, Android; full PDF authoring deferred |
-| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024; native swipe, end/start handle drags, release-stop and source restoration tests on Pixel 7 / Fold | Local pass; physical build-13 gestures and cross-chapter ranges open |
-| ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests | Partial, Android build 12; physical follow-up pending |
+| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024/025; native swipe, end/start handle drags, selection retention and source restoration tests | Build 13 physical forward pass; build 14 physical follow-up and cross-chapter ranges open |
+| ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests and in-reader panels (ADR 025) | Partial, Android; build 14 physical follow-up pending |
 | BOOKMARK-001 | flags/resume | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | AI-001 | contextual chat | C | Planned in milestone | Planned |
 | AI-002 | BYOK provider registry | C | Planned in milestone | Planned |

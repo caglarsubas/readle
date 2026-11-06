@@ -74,6 +74,7 @@ function LibraryScreen() {
   const [recent, setRecent] = useState<Session[]>([]);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [tab, setTab] = useState<'library' | 'continue'>('library');
+  const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
@@ -125,10 +126,20 @@ function LibraryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
       <View style={styles.header}>
         <Text style={styles.brand}>readle</Text>
-        <Text style={styles.edition}>READER SPIKE · 0.1</Text>
+        <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        {selected ? (
+        {about ? (
+          <>
+            <Text style={styles.heading}>About Readle</Text>
+            <Text style={styles.body}>
+              {library?.versionName
+                ? `Version ${library.versionName} · Build ${library.buildNumber}`
+                : 'Version unavailable'}
+            </Text>
+            <Text style={styles.body}>Read and keep notes in your own book sessions.</Text>
+          </>
+        ) : selected ? (
           <>
             <Pressable
               accessibilityRole="button"

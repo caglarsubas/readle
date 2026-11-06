@@ -25,7 +25,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Exercises the real reader, native touch dispatch, dialogs, and existing SQLite schema. */
+/** Exercises the real reader, native touch dispatch, reader panels, and existing SQLite schema. */
 @RunWith(AndroidJUnit4::class)
 class HighlightInteractionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -279,7 +279,10 @@ class HighlightInteractionTest {
             )
         tapEpubHighlight()
         click("Delete highlight")
-        click("Keep")
+        assertTrue(
+            waitForNode { it.text?.toString() == "Keep" }
+                .performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        )
         assertEquals(
             originalLocator,
             database.annotation(sessionId, annotationId)!!.getString("locator"),
@@ -342,8 +345,11 @@ class HighlightInteractionTest {
                 Intent(context, ReaderActivity::class.java).putExtra("sessionId", sessionId)
             )
         waitUntil {
-            evaluateEpub("document.querySelectorAll('[data-group=readle] [data-style]').length") ==
-                "1"
+            evaluateEpub(
+                "window.readium && readium.getDecorations('readle').items.some(i => i.decoration.id === " +
+                    JSONObject.quote(saved.getString("id")) +
+                    ")"
+            ) == "true"
         }
         assertEquals(
             saved.getString("locator"),
@@ -481,6 +487,162 @@ class HighlightInteractionTest {
         assertTrue(quote.endsWith("appearance"))
     }
 
+    @Test
+    fun scrollAndPagesHaveDistinctTouchAxesAndScrollContinuesAtChapterEdge() {
+        launchEpubForGestures()
+        val bounds = webScreenBounds()
+        val x = bounds.exactCenterX()
+        val y = bounds.exactCenterY()
+        swipe(x, y + bounds.height() * .25f, x, y - bounds.height() * .25f)
+        waitUntil { webScrollXy().second > 100 }
+        assertEquals(0, webScrollXy().first)
+        assertTrue(evaluateEpub("location.pathname").contains("c0.xhtml"))
+        // Move to the bottom, allowing the native viewport to catch up to the DOM.
+        // Chromium can still be finishing the first fling when scrollTo returns.
+        waitUntil {
+            evaluateEpub("scrollTo(0, document.scrollingElement.scrollHeight)")
+            var atEnd = false
+            scenario!!.onActivity { activity ->
+                val web = findVisibleWebView(activity.window.decorView)!!
+                atEnd = !web.canScrollVertically(1)
+            }
+            atEnd
+        }
+        swipe(x, y + bounds.height() * .25f, x, y - bounds.height() * .25f)
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil { webScrollXy().second < 10 }
+        swipe(x, y - bounds.height() * .25f, x, y + bounds.height() * .25f)
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        waitUntil { webScrollXy().second > 100 }
+
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        click("Contents")
+        click("1. A place for an idea")
+        waitUntil { webScrollXy().first == 0 }
+        swipe(bounds.right - bounds.width() * .15f, y, bounds.left + bounds.width() * .15f, y)
+        waitUntil { webScrollXy().first > 100 }
+        assertEquals(0, webScrollXy().second)
+        click("Layout")
+        click("Continuous scroll")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollHeight > innerHeight * 1.5") == "true"
+        }
+        assertEquals(0, webScrollXy().first)
+    }
+
+    @Test
+    fun previousNextAndHorizontalSwipesKeepTheSelectedPassage() {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        longPressEpubWord()
+        click("Next")
+        waitUntil { webScrollXy().first > 100 }
+        waitUntil { selectionState()?.optString("quote") == "appearance" }
+        val held = selectionState()!!.getJSONObject("locator").toString()
+        click("Previous")
+        waitUntil { webScrollXy().first == 0 }
+        assertEquals(held, selectionState()!!.getJSONObject("locator").toString())
+        click("Selection")
+        click("Add note")
+        scenario!!.onActivity { reader ->
+            assertNotNull(findView(reader.window.decorView, android.widget.EditText::class.java))
+        }
+        val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }
+        editor.performAction(
+            AccessibilityNodeInfo.ACTION_SET_TEXT,
+            Bundle().apply {
+                putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    "Kept through page turns",
+                )
+            },
+        )
+        click("Save")
+        waitUntil {
+            (0 until database.annotations(sessionId).length()).any {
+                database.annotations(sessionId).getJSONObject(it).getString("note") ==
+                    "Kept through page turns"
+            }
+        }
+
+        longPressEpubWord("changes")
+        val bounds = webScreenBounds()
+        swipe(
+            bounds.right - bounds.width() * .15f,
+            bounds.exactCenterY(),
+            bounds.left + bounds.width() * .15f,
+            bounds.exactCenterY(),
+        )
+        waitUntil { webScrollXy().first > 100 }
+        waitUntil { selectionState()?.optString("quote") == "changes" }
+        click("Selection")
+        click("Open passage")
+        waitUntil { webScrollXy().first == 0 }
+    }
+
+    @Test
+    fun epubFindShowsNoMatchesThenOpensTheMatchingChapterAndQuote() {
+        launchEpubForGestures()
+        click("Find")
+        fun setQuery(query: String) {
+            waitForNode { it.className?.toString() == "android.widget.EditText" }
+                .performAction(
+                    AccessibilityNodeInfo.ACTION_SET_TEXT,
+                    Bundle().apply {
+                        putCharSequence(
+                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                            query,
+                        )
+                    },
+                )
+            click("Find text")
+        }
+        setQuery("zzzxq-not-a-word")
+        waitForNode { it.text?.toString() == "No matches found." }
+        setQuery("hypothetical linear response")
+        val result = waitForNode {
+            it.className?.toString() == "android.widget.Button" &&
+                it.text?.toString()?.contains("hypothetical linear response.") == true &&
+                it.isVisibleToUser
+        }
+        assertTrue(result.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil {
+            evaluateEpub(
+                """readium.getDecorations('find').items.some(item => item.range.toString() === 'hypothetical linear response')"""
+            ) == "true"
+        }
+        val quoteY =
+            evaluateEpub(
+                    """readium.getDecorations('find').items[0].range.getBoundingClientRect().top"""
+                )
+                .toDouble()
+        assertTrue(quoteY >= 0)
+        assertTrue(quoteY < evaluateEpub("innerHeight").toDouble())
+    }
+
+    private fun selectionState(): JSONObject? =
+        JSONObject(database.session(sessionId).getString("state")).optJSONObject("selection")
+
+    private fun swipe(x: Float, y: Float, endX: Float, endY: Float) {
+        val down = SystemClock.uptimeMillis()
+        sendTouch(MotionEvent.ACTION_DOWN, down, x, y)
+        for (step in 1..12) {
+            val f = step / 12f
+            sendTouch(MotionEvent.ACTION_MOVE, down, x + (endX - x) * f, y + (endY - y) * f)
+            SystemClock.sleep(15)
+        }
+        sendTouch(MotionEvent.ACTION_UP, down, endX, endY)
+    }
+
     private fun captureGesture(name: String) {
         File(context.getExternalFilesDir(null), "gesture-$name.png").outputStream().use {
             instrumentation.uiAutomation
@@ -537,15 +699,15 @@ class HighlightInteractionTest {
             bounds.top + xy.getDouble(1).toFloat() * density
     }
 
-    private fun longPressEpubWord() {
+    private fun longPressEpubWord(word: String = "appearance") {
         val point =
             screenPoint(
                 """
                 (function() {
                     for (const p of document.querySelectorAll('p')) {
-                        const n = p.firstChild; const at = n.textContent.indexOf('appearance');
+                        const n = p.firstChild; const at = n.textContent.indexOf(${JSONObject.quote(word)});
                         if (at < 0) continue;
-                        const r = document.createRange(); r.setStart(n, at); r.setEnd(n, at + 10);
+                        const r = document.createRange(); r.setStart(n, at); r.setEnd(n, at + ${word.length});
                         const b = r.getBoundingClientRect();
                         if (b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight)
                             return [b.left + b.width/2, b.top + b.height/2];
@@ -559,7 +721,7 @@ class HighlightInteractionTest {
         sendTouch(MotionEvent.ACTION_DOWN, down, point.first, point.second)
         SystemClock.sleep(750)
         sendTouch(MotionEvent.ACTION_UP, down, point.first, point.second)
-        waitUntil { evaluateEpub("getSelection().toString().trim()") == "\"appearance\"" }
+        waitUntil { evaluateEpub("getSelection().toString().trim()") == JSONObject.quote(word) }
     }
 
     private fun selectionHandle(start: Boolean) =
@@ -788,15 +950,19 @@ class HighlightInteractionTest {
     }
 
     private fun findVisibleWebView(view: View): WebView? {
-        if (view is WebView && view.isShown && view.getGlobalVisibleRect(android.graphics.Rect()))
-            return view
-        if (view is ViewGroup)
-            for (index in 0 until view.childCount) {
-                findVisibleWebView(view.getChildAt(index))?.let {
-                    return it
-                }
+        fun candidates(node: View): Sequence<WebView> = sequence {
+            if (node is WebView && node.isShown) yield(node)
+            if (node is ViewGroup)
+                for (index in 0 until node.childCount) yieldAll(candidates(node.getChildAt(index)))
+        }
+        val bounds = android.graphics.Rect()
+        return candidates(view)
+            .mapNotNull {
+                if (it.getGlobalVisibleRect(bounds)) it to bounds.width() * bounds.height()
+                else null
             }
-        return null
+            .maxByOrNull { it.second }
+            ?.first
     }
 
     private fun <T : View> findView(view: View, type: Class<T>): T? {

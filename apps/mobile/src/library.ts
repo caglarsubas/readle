@@ -22,6 +22,8 @@ export type ImportItem = {
   bookId: string;
 };
 interface LibraryBridge {
+  versionName: string;
+  buildNumber: string;
   books(): Promise<Book[]>;
   sessions(bookId: string): Promise<Session[]>;
   recentSessions(): Promise<Session[]>;

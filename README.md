@@ -14,20 +14,20 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 14
+./scripts/build-android.sh 15
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-13.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-14.apk`.
 
 ## Install the current Android UAT build
 
-Build 13 is the current private handoff. It corrects EPUB scrolling with a selected word and adds native handle-driven page turns. Build 12’s session isolation, annotations and PDF reference behavior remain in place. Build 10 passed the product owner’s Android UAT on a Samsung Z Fold7 running Android 17. With one authorized Android phone connected by USB, run `./scripts/install-android-uat.sh 13` from the repository root. The installer verifies the APK checksum, retains existing app data, copies the import-test fixtures and opens Readle. See [the phone setup and UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a build number higher than 13 for the next update.
+Build 14 is the current private handoff. In the Library, **About** shows the installed version and build. Install over build 13 using **Update**, or run `./scripts/install-android-uat.sh 14` with one authorized phone connected by USB. The installer checks the APK checksum, retains existing data, copies the sample fixtures and opens Readle. See [the UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a higher build number for the next update.
 
 ## Try it
 
 Open **Add sample books**, select an EPUB, and start reading. Each new session starts at the beginning with no copied notes, highlights, selection or assistant state. Add a note, return to Library and create another session for the same book. It starts blank. Resume the first session to return to its own work.
 
-New EPUB sessions use continuous scrolling. **Layout** switches between continuous scroll and pages; each session remembers its choice. In scroll mode, keep a word selected while scrolling or extending its native handles. In Pages, drag an end handle to the right text edge to continue forward, or a start handle to the left to extend backward; hold briefly for a turn and release to stop. Then choose Highlight or Note. This is bounded to the current chapter/spine resource. Tap a saved highlight for object actions. **Notes** lists and exports only this session’s annotations.
+New reflowable EPUB sessions use vertical scrolling. In **Continuous scroll**, swipe up or down, then swipe again at a chapter edge to continue. **Pages** uses horizontal turns. The layout is saved per session. Drag an end/start handle to the right/left text edge to extend the selection into the next/previous page of the current chapter. An ordinary page turn keeps the passage available from **Selection**. Open or edit notes and highlights in the reader panel. **Find** searches EPUB text offline and marks the chosen result in the book.
 
 PDF is labelled **Source/reference** and always fits the current window width. It retains page/vertical position and its session’s existing annotations. A short tap outside a temporary selection clears it. **Open original** opens a local PDF viewer of your choice for advanced PDF controls. PDF reflow and cross-page authoring are deferred. Existing multi-page annotations remain readable.
 

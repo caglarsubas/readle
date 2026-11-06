@@ -26,6 +26,15 @@ class LibraryModule(private val context: ReactApplicationContext) :
 
     override fun getName() = "ReadleLibrary"
 
+    override fun getConstants(): Map<String, Any> {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return mapOf(
+            "versionName" to (info.versionName ?: ""),
+            "buildNumber" to
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info).toString(),
+        )
+    }
+
     private fun async(promise: Promise, block: () -> Any?) {
         executor.execute {
             try {

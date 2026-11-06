@@ -53,13 +53,19 @@ internal class ReadleSelectionActionMode(
             }
         }
 
+    init {
+        // Capture the resting endpoints before the drag notification. Some WebViews send
+        // hide() only after the first endpoint change.
+        view.runJavaScript("window.__readleSelectionEdge = null;")
+        view.runJavaScript(EDGE.replace("__SCROLL__", view.scrollMode.toString()))
+    }
+
     override fun hide(duration: Long) {
         delegate.hide(duration)
         if (duration >= ViewConfiguration.getDefaultActionModeHideDuration()) {
             if (!monitoring) {
                 monitoring = true
                 candidate = 0
-                view.runJavaScript("window.__readleSelectionEdge = null;")
                 view.post(poll)
             }
         } else stop()
@@ -69,6 +75,9 @@ internal class ReadleSelectionActionMode(
         monitoring = false
         candidate = 0
         view.removeCallbacks(poll)
+        view.runJavaScript(
+            "if (window.__readleSelectionEdge) window.__readleSelectionEdge.side = null;"
+        )
     }
 
     override fun finish() {
@@ -155,11 +164,18 @@ internal class ReadleSelectionActionMode(
                 const direction = (st.side === 'start' ? -1 : 1) * (rtl ? -1 : 1);
                 const x = direction < 0 ? 1 : innerWidth - 1;
                 const at = document.caretRangeFromPoint(x, b.top + b.height/2);
+                const margin = Math.max(24, Math.min(72, innerWidth * 0.10));
+                if (direction < 0 ? b.left <= margin : b.right >= innerWidth - margin) return direction;
                 if (!at) return 0;
-                const node = st.side === 'start' ? st.a : st.z;
-                const offset = st.side === 'start' ? st.ao : st.zo;
-                const matched = at.startContainer === node && Math.abs(at.startOffset - offset) <= 1;
-                return matched ? direction : 0;
+                // A line edge can resolve to an adjacent inline node, such as an italic
+                // span or whitespace at the beginning of a paragraph. Compare boundaries.
+                const edge = p.cloneRange();
+                if (p.compareBoundaryPoints(Range.START_TO_START, at) <= 0) {
+                    edge.setEnd(at.startContainer, at.startOffset);
+                } else {
+                    edge.setStart(at.startContainer, at.startOffset);
+                }
+                return edge.toString().trim().length <= 1 ? direction : 0;
             })()
             """
                 .trimIndent()
