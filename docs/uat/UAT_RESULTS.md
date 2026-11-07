@@ -58,6 +58,14 @@ Device: Samsung Z Fold7 / Android 17, as previously reported. These are physical
 
 Forward extension was reported working. The report does not establish a pass for the other build-13 checks. Build 14 addresses these observations under B01d; physical acceptance remains pending.
 
+## Build 14 — Android Studio visual review — 2026-11-07
+
+At the owner's request, operated the installed build through the existing Android Studio application's visible Pixel 7 and Pixel Fold API 36 emulators. [Full observations and screenshots](BUILD_14_VISUAL_REVIEW.md) distinguish the exercised subchecks from blocked or untested ones.
+
+About, vertical scrolling with a selected word, in-reader note save/reopen, forward/backward horizontal page swipes, retained quotes and Find results were observed working. Active selection handles disappear after ordinary page turns (VIS14-01); retaining the quote alone does not complete the requested adjustable selection interaction. The device Back control left Notes open while its Close button worked (VIS14-02). Held-edge turns were not qualified with the available drag input. Folding reached an Android lock screen that the available gestures did not dismiss, leaving cover/restoration testing blocked. No physical Z Fold7 acceptance or complete B14 pass is recorded.
+
+Future reader handoffs require a recorded visual Android Studio gesture review alongside automated checks. Build 14's full interaction acceptance remains open.
+
 ## Open evidence and rollback
 
 Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Build-12 physical Z Fold7 fold/unfold was accepted in the owner report. Native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending. EPUB selection gesture acceptance remains open.

@@ -15,6 +15,8 @@ Find uses the local Readium search iterator and shows excerpts. Tapping a result
 
 ## Verification scope
 
+The [2026-11-07 Android Studio visual review](BUILD_14_VISUAL_REVIEW.md) observed scrolling, quote retention, note save/reopen and Find, but left the full interaction gate open. Adjustable selection handles disappear after normal page turns, and the device Back control did not dismiss Notes. Held-edge and complete foldable checks remain unqualified. These observations qualify the implementation descriptions above; automated passes do not establish visual acceptance.
+
 The app test exercises About using package metadata. Native touch tests distinguish the two layouts, navigate vertical chapter edges, drag both native handles, stop after release, retain a new selection through button/swipe turns, and save/reopen the rendered passage. Tests also exercise the in-reader note editor and search for a passage in a different EPUB chapter, including a no-results query. The private receipt retains exact APK, emulator and CI evidence.
 
 Physical Z Fold7 / Android 17 testing is open. Run [B14-01..07](ANDROID_UAT.md) on both screens, including your own EPUB. Continuous scroll has discrete transitions at chapter boundaries; native range extension across separate resources is still open. Fixed-layout EPUBs stay paginated. Native iOS and named-hardware accessibility and timing gates are separate.
