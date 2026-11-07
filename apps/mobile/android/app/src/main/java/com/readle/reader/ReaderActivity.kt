@@ -14,7 +14,9 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.*
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -24,6 +26,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -35,6 +38,9 @@ import org.readium.r2.navigator.epub.EpubPreferences
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Locator
 import org.readium.r2.shared.publication.Publication
+import org.readium.r2.shared.publication.epub.EpubLayout
+import org.readium.r2.shared.publication.presentation.presentation
+import org.readium.r2.shared.publication.services.search.search
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
@@ -49,23 +55,39 @@ class ReaderActivity : AppCompatActivity() {
     private lateinit var book: JSONObject
     private lateinit var content: FrameLayout
     private lateinit var status: TextView
+    private lateinit var panel: ReaderPanel
+    private var findJob: Job? = null
+    private var turningPage = false
+    private var selectionKept = false
     private var epub: EpubNavigatorFragment? = null
     private var publication: Publication? = null
     private var pdf: PdfRenderer? = null
     private var pdfText: PDDocument? = null
     private var pdfPage: PdfPageView? = null
     private var pdfScroll: ScrollView? = null
-    private var pdfViewport: PdfViewport? = null
+    private var pdfRenderedWidth = 0
+    private var pdfRenderGeneration = 0
+    private val resizePdf = Runnable {
+        if (!isFinishing && pdf != null && content.width > 0 && content.width != pdfRenderedWidth)
+            showPdf(pageIndex)
+    }
     private val annotationActions by lazy {
-        AnnotationActions(this, database, book, ::annotationChanged, ::openAnnotationSource)
+        AnnotationActions(
+            this,
+            panel,
+            database,
+            book,
+            sessionId,
+            ::annotationDeleted,
+            ::openAnnotationSource,
+        )
     }
     private var pageIndex = 0
-    private var zoom = 1.0
+    private var epubScroll = true
+    private var fixedLayout = false
     private var fontSize = 1.0
     private var selectedLocator: JSONObject? = null
     private var selectedQuote = ""
-    private var selectionPrefix: JSONObject? = null
-    private var selectionPrefixQuote = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Rebuild the navigator from the durable locator after process death.
@@ -83,7 +105,7 @@ class ReaderActivity : AppCompatActivity() {
             check(state.getString("sourceVersion") == book.getString("sourceVersion")) {
                 "This session requires its original edition."
             }
-            zoom = state.getJSONObject("preferences").optDouble("pdfZoom", 1.0)
+            epubScroll = state.getJSONObject("preferences").optBoolean("epubScroll", true)
             fontSize = state.getJSONObject("preferences").optDouble("fontSize", 1.0)
             selectedLocator = state.optJSONObject("selection")?.optJSONObject("locator")
             selectedQuote = state.optJSONObject("selection")?.optString("quote", "") ?: ""
@@ -97,7 +119,9 @@ class ReaderActivity : AppCompatActivity() {
             header.addView(button("Library") { finish() })
             header.addView(
                 TextView(this).apply {
-                    text = session.getString("label")
+                    text =
+                        session.getString("label") +
+                            if (book.getString("format") == "pdf") " · PDF source" else ""
                     textSize = 16f
                     gravity = 17
                 },
@@ -108,19 +132,34 @@ class ReaderActivity : AppCompatActivity() {
             val isPdf = book.getString("format") == "pdf"
             val tools = LinearLayout(this)
             tools.addView(button("Contents") { showContents() })
-            tools.addView(button(if (isPdf) "Zoom −" else "Text −") { resize(-0.15) })
-            tools.addView(button(if (isPdf) "Zoom +" else "Text +") { resize(0.15) })
+            if (isPdf) tools.addView(button("Open original") { openOriginalPdf() })
+            else {
+                tools.addView(button("Text −") { resize(-0.15) })
+                tools.addView(button("Text +") { resize(0.15) })
+            }
             tools.addView(button("Find") { findInBook() })
             for (index in 0 until tools.childCount) {
                 tools.getChildAt(index).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             }
             root.addView(tools)
             content = FrameLayout(this).apply { id = View.generateViewId() }
-            root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+            val workspace = FrameLayout(this)
+            workspace.addView(content, FrameLayout.LayoutParams(-1, -1))
+            root.addView(workspace, LinearLayout.LayoutParams(-1, 0, 1f))
+            panel = ReaderPanel(this, workspace) { findJob?.cancel() }
+            onBackPressedDispatcher.addCallback(
+                this,
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        if (panel.visible) panel.close() else finish()
+                    }
+                },
+            )
             val navigation = LinearLayout(this)
-            navigation.addView(button("Previous") { epub?.goBackward() ?: showPdf(pageIndex - 1) })
-            navigation.addView(button("Next") { epub?.goForward() ?: showPdf(pageIndex + 1) })
+            navigation.addView(button("Previous") { turnPage(false) })
+            navigation.addView(button("Next") { turnPage(true) })
             navigation.addView(button("Selection") { selectionActions() })
+            if (!isPdf) navigation.addView(button("Layout") { chooseEpubLayout() })
             for (index in 0 until navigation.childCount) {
                 navigation.getChildAt(index).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             }
@@ -132,7 +171,10 @@ class ReaderActivity : AppCompatActivity() {
                 }
             root.addView(status)
             ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                val bars =
+                    insets.getInsets(
+                        WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
+                    )
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
                 insets
             }
@@ -142,8 +184,10 @@ class ReaderActivity : AppCompatActivity() {
             }
             val locator = state.optJSONObject("readingLocator")
             content.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
-                if (pdf != null && right - left != oldRight - oldLeft)
-                    content.post { showPdf(pageIndex) }
+                if (pdf != null && right - left != oldRight - oldLeft) {
+                    content.removeCallbacks(resizePdf)
+                    content.post(resizePdf)
+                }
             }
             if (book.getString("format") == "epub") openEpub(locator)
             else content.post { openPdf(locator) }
@@ -196,11 +240,13 @@ class ReaderActivity : AppCompatActivity() {
                     throw IllegalStateException(it.toString())
                 }
             publication = pub
+            fixedLayout = pub.metadata.presentation.layout == EpubLayout.FIXED
             supportFragmentManager.fragmentFactory =
                 EpubNavigatorFactory(pub)
                     .createFragmentFactory(
                         initialLocator = initial?.let { Locator.fromJSON(it) },
-                        initialPreferences = EpubPreferences(fontSize = fontSize, scroll = false),
+                        initialPreferences =
+                            EpubPreferences(fontSize = fontSize, scroll = epubScroll),
                         configuration =
                             EpubNavigatorFragment.Configuration(
                                 selectionActionModeCallback = selectionCallback
@@ -212,6 +258,7 @@ class ReaderActivity : AppCompatActivity() {
                     EpubNavigatorFragment::class.java.name,
                 ) as EpubNavigatorFragment
             epub = navigator
+            navigator.readlePageTurn = { forward -> turnPage(forward) }
             supportFragmentManager.beginTransaction().replace(content.id, navigator).commitNow()
             navigator.addDecorationListener(
                 "readle",
@@ -219,7 +266,7 @@ class ReaderActivity : AppCompatActivity() {
                     override fun onDecorationActivated(
                         event: DecorableNavigator.OnActivatedEvent
                     ): Boolean {
-                        if (database.annotation(book.getString("id"), event.decoration.id) == null)
+                        if (database.annotation(sessionId, event.decoration.id) == null)
                             return false
                         // Readium 3.1 delivers decoration activation on WebView's JavaBridge
                         // thread.
@@ -241,8 +288,7 @@ class ReaderActivity : AppCompatActivity() {
                         locator.title ?: "EPUB position ${locator.locations.position ?: 1}",
                     )
                 }
-                status.text =
-                    "${book.getString("title")} · ${locator.title ?: "Reading"} · Saved on device"
+                updateEpubStatus(locator)
                 applyEpubHighlights()
             }
         } catch (e: CancellationException) {
@@ -270,8 +316,8 @@ class ReaderActivity : AppCompatActivity() {
                         selection.locator.toJSON(),
                         selection.locator.text.highlight ?: "",
                     )
-                    if (item.itemId == 802) addNote() else saveAnnotation("")
                     mode.finish()
+                    if (item.itemId == 802) addNote() else saveAnnotation("")
                 }
                 return true
             }
@@ -295,7 +341,7 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private suspend fun applyEpubHighlights() {
-        val rows = database.annotations(book.getString("id"))
+        val rows = database.annotations(sessionId)
         val decorations =
             (0 until rows.length())
                 .mapNotNull { index ->
@@ -337,28 +383,36 @@ class ReaderActivity : AppCompatActivity() {
         }
     }
 
+    private fun pdfStatus() =
+        "PDF reference · Page ${pageIndex + 1} of ${pdf?.pageCount ?: 0} · Fits screen width"
+
     private fun showPdf(index: Int) {
         val renderer = pdf ?: return
-        if (index !in 0 until renderer.pageCount) return
+        if (index !in 0 until renderer.pageCount || content.width <= 0) return
         try {
             val prior =
                 JSONObject(database.session(sessionId).getString("state"))
                     .optJSONObject("readingLocator")
-            pageIndex = index
-            pdfPage?.release()
+            val viewportWidth = content.width
+            val generation = ++pdfRenderGeneration
             val page = renderer.openPage(index)
             val width = page.width.toFloat()
             val height = page.height.toFloat()
-            val viewportWidth = content.width.coerceAtLeast(1)
-            val pixels = (viewportWidth * zoom).toInt().coerceIn(320, 2048)
+            val pixels = viewportWidth.coerceIn(320, 2048)
             val bitmap =
-                Bitmap.createBitmap(
-                    pixels,
-                    (pixels * height / width).roundToInt().coerceAtMost(4096),
-                    Bitmap.Config.ARGB_8888,
-                )
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-            page.close()
+                try {
+                    Bitmap.createBitmap(
+                            pixels,
+                            (pixels * height / width).roundToInt().coerceAtMost(4096),
+                            Bitmap.Config.ARGB_8888,
+                        )
+                        .also {
+                            it.eraseColor(android.graphics.Color.WHITE)
+                            page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        }
+                } finally {
+                    page.close()
+                }
             val extractor =
                 PositionedText().apply {
                     startPage = index + 1
@@ -366,8 +420,8 @@ class ReaderActivity : AppCompatActivity() {
                     sortByPosition = true
                 }
             extractor.getText(pdfText)
+            val annotations = database.annotations(sessionId)
             val marks = mutableListOf<PdfHighlight>()
-            val annotations = database.annotations(book.getString("id"))
             for (i in 0 until annotations.length()) {
                 val row = annotations.getJSONObject(i)
                 val rectangles = mutableListOf<RectF>()
@@ -392,47 +446,36 @@ class ReaderActivity : AppCompatActivity() {
                 if (rectangles.isNotEmpty())
                     marks.add(PdfHighlight(row.getString("id"), row.getString("quote"), rectangles))
             }
+            // Keep one surface for this activity, including fold/resize events. Never stack page
+            // views.
             val view =
-                PdfPageView(
-                    this,
-                    onAnnotationTap = { annotationActions.show(it) },
-                    onSelection = { locator, quote ->
-                        val prefix = selectionPrefix
-                        if (prefix != null)
-                            rememberSelection(
-                                JSONObject()
-                                    .put("pages", JSONArray().put(prefix).put(locator))
-                                    .put("pageIndex", prefix.getInt("pageIndex")),
-                                "$selectionPrefixQuote $quote",
-                            )
-                        else rememberSelection(locator, quote)
-                        status.text = "Selected: ${selectedQuote.take(100)}"
-                    },
-                )
-            view.extendFromPageStart = selectionPrefix != null
+                pdfPage
+                    ?: PdfPageView(
+                            this,
+                            onAnnotationTap = { annotationActions.show(it) },
+                            onClearSelection = { clearPdfSelection() },
+                            onSelection = { locator, quote ->
+                                rememberSelection(locator, quote)
+                                status.text = "Selected: ${quote.take(100)}"
+                            },
+                        )
+                        .also { pageView ->
+                            pdfPage = pageView
+                            pdfScroll = ScrollView(this).apply { addView(pageView) }
+                            content.removeAllViews()
+                            content.addView(pdfScroll)
+                        }
+            pageIndex = index
+            pdfRenderedWidth = viewportWidth
             view.pageIndex = index
-            view.display(bitmap, width, height, extractor.glyphs, marks)
-            val visualWidth = (viewportWidth * zoom).roundToInt()
             view.layoutParams =
-                android.view.ViewGroup.LayoutParams(
-                    visualWidth,
-                    (visualWidth * height / width).roundToInt(),
+                FrameLayout.LayoutParams(
+                    viewportWidth,
+                    (viewportWidth * height / width).roundToInt(),
                 )
-            val vertical = ScrollView(this).apply { addView(view) }
-            val horizontal =
-                PdfViewport(
-                        this,
-                        onZoom = { factor, x, y -> zoomPdf(zoom * factor, x, y) },
-                        onDoubleTapZoom = { x, y -> zoomPdf(if (zoom > 1.1) 1.0 else 2.0, x, y) },
-                    )
-                    .apply { addView(vertical) }
-            content.removeAllViews()
-            content.addView(horizontal)
-            pdfPage = view
-            pdfScroll = vertical
-            pdfViewport = horizontal
+            view.display(bitmap, width, height, extractor.glyphs, marks)
             val selectionPages = selectedLocator?.optJSONArray("pages")
-            if (!selectionIsSaved(annotations)) {
+            if (!selectionIsSaved(annotations))
                 view.restoreSelection(
                     if (selectionPages == null) selectedLocator
                     else
@@ -440,83 +483,161 @@ class ReaderActivity : AppCompatActivity() {
                             .map { selectionPages.getJSONObject(it) }
                             .find { it.optInt("pageIndex", -1) == index }
                 )
-            }
-            val restoringPage = prior?.optInt("pageIndex", -1) == index
-            val offsetX = if (restoringPage) prior!!.optDouble("offsetX", 0.0) else 0.0
-            val offsetY = if (restoringPage) prior!!.optDouble("offsetY", 0.0) else 0.0
+            val offsetY =
+                if (prior?.optInt("pageIndex", -1) == index) prior.optDouble("offsetY", 0.0)
+                else 0.0
             database.mutateSession(sessionId) {
                 it.put(
                     "readingLocator",
                     JSONObject()
                         .put("pageIndex", pageIndex)
-                        .put("offsetX", offsetX)
+                        .put("offsetX", 0)
                         .put("offsetY", offsetY),
                 )
                 it.put("locationLabel", "Page ${pageIndex + 1}")
+                it.getJSONObject("preferences").put("pdfZoom", 1.0)
             }
-            vertical.setOnScrollChangeListener { _, _, _, _, _ -> persistPdfPosition() }
-            horizontal.setOnScrollChangeListener { _, _, _, _, _ -> persistPdfPosition() }
-            vertical.post {
-                horizontal.scrollTo((offsetX * view.width).roundToInt(), 0)
-                vertical.scrollTo(0, (offsetY * view.height).roundToInt())
-                persistPdfPosition()
+            pdfScroll!!.setOnScrollChangeListener(null)
+            view.post {
+                if (generation == pdfRenderGeneration && !isFinishing && !isDestroyed) {
+                    pdfScroll!!.scrollTo(0, (offsetY * view.height).roundToInt())
+                    pdfScroll!!.setOnScrollChangeListener { _, _, _, _, _ -> persistPdfPosition() }
+                    persistPdfPosition()
+                }
             }
-            status.text = "Page ${index + 1} of ${renderer.pageCount} · Saved on device"
+            status.text = pdfStatus()
         } catch (e: Exception) {
             showError(e.message ?: "Page unavailable")
         }
     }
 
     private fun persistPdfPosition() {
-        val offset = (pdfScroll?.scrollY ?: 0).toDouble() / (pdfPage?.height ?: 1).coerceAtLeast(1)
+        val page = pdfPage ?: return
+        val offset = (pdfScroll?.scrollY ?: 0).toDouble() / page.height.coerceAtLeast(1)
         database.mutateSession(sessionId) {
             it.put(
                 "readingLocator",
-                JSONObject()
-                    .put("pageIndex", pageIndex)
-                    .put("offsetY", offset)
-                    .put(
-                        "offsetX",
-                        (pdfViewport?.scrollX ?: 0).toDouble() /
-                            (pdfPage?.width ?: 1).coerceAtLeast(1),
-                    ),
+                JSONObject().put("pageIndex", pageIndex).put("offsetY", offset).put("offsetX", 0),
             )
             it.put("locationLabel", "Page ${pageIndex + 1}")
         }
     }
 
+    private fun clearPdfSelection() {
+        selectedLocator = null
+        selectedQuote = ""
+        pdfPage?.clearSelection()
+        database.mutateSession(sessionId) { it.put("selection", JSONObject.NULL) }
+        status.text = pdfStatus()
+    }
+
     private fun resize(delta: Double) {
-        if (epub != null) {
-            fontSize = (fontSize + delta).coerceIn(0.7, 2.5)
-            epub?.submitPreferences(EpubPreferences(fontSize = fontSize))
-        } else {
-            zoomPdf(zoom + delta, content.width / 2f, content.height / 2f)
-        }
+        fontSize = (fontSize + delta).coerceIn(0.7, 2.5)
+        epub?.submitPreferences(EpubPreferences(fontSize = fontSize, scroll = epubScroll))
         database.mutateSession(sessionId) {
-            it.getJSONObject("preferences").put("fontSize", fontSize).put("pdfZoom", zoom)
+            it.getJSONObject("preferences").put("fontSize", fontSize)
         }
     }
 
-    private fun zoomPdf(requestedZoom: Double, focusX: Float, focusY: Float) {
-        val view = pdfPage ?: return
-        if (view.width == 0 || view.height == 0) return
-        val nextZoom = requestedZoom.coerceIn(0.5, 3.0)
-        if (nextZoom == zoom) return
-        val ratio = nextZoom / zoom
-        val sourceX = ((pdfViewport?.scrollX ?: 0) + focusX) / view.width
-        val sourceY = ((pdfScroll?.scrollY ?: 0) + focusY) / view.height
-        database.mutateSession(sessionId) {
-            it.getJSONObject("preferences").put("pdfZoom", nextZoom)
-            it.put(
-                "readingLocator",
-                JSONObject()
-                    .put("pageIndex", pageIndex)
-                    .put("offsetX", (sourceX - focusX / (view.width * ratio)).coerceAtLeast(0.0))
-                    .put("offsetY", (sourceY - focusY / (view.height * ratio)).coerceAtLeast(0.0)),
-            )
+    private fun updateEpubStatus(locator: Locator? = epub?.currentLocator?.value) {
+        val title = locator?.title ?: "Reading"
+        val layout = if (epubScroll && !fixedLayout) "Scroll" else "Pages"
+        status.text = "$title · $layout" + if (selectionKept) " · Selection kept" else ""
+    }
+
+    private suspend fun captureSelection(): Boolean {
+        val selection = epub?.currentSelection() ?: return false
+        val quote = selection.locator.text.highlight?.takeIf { it.isNotBlank() } ?: return false
+        rememberSelection(selection.locator.toJSON(), quote)
+        return true
+    }
+
+    private fun turnPage(forward: Boolean) {
+
+        val navigator = epub
+        if (navigator == null) {
+            if (pdf != null) showPdf(pageIndex + if (forward) 1 else -1)
+            return
         }
-        zoom = nextZoom
-        showPdf(pageIndex)
+        if (turningPage) return
+        turningPage = true
+        lifecycleScope.launch {
+            try {
+                if (captureSelection()) {
+                    selectionKept = true
+                    navigator.clearSelection()
+                    applyEpubHighlights()
+                }
+                panel.close()
+                if (forward) navigator.goForward(animated = false)
+                else navigator.goBackward(animated = false)
+                updateEpubStatus()
+            } finally {
+                turningPage = false
+            }
+        }
+    }
+
+    private fun chooseEpubLayout() {
+        if (epub == null) return
+        if (fixedLayout) {
+            panel.show("Reading layout") {
+                addView(
+                    panel.text(
+                        "This EPUB has fixed pages. Use Previous or Next to move through the book."
+                    )
+                )
+            }
+            return
+        }
+        panel.show("Reading layout") {
+            addView(
+                panel.text(
+                    if (epubScroll) "Scroll up or down. Swipe again at a chapter edge to continue."
+                    else "Swipe left or right to turn a page."
+                )
+            )
+            addView(
+                panel
+                    .action("Continuous scroll") { setEpubLayout(true) }
+                    .apply { isEnabled = !epubScroll }
+            )
+            addView(panel.action("Pages") { setEpubLayout(false) }.apply { isEnabled = epubScroll })
+        }
+    }
+
+    private fun setEpubLayout(scroll: Boolean) = lifecycleScope.launch {
+        if (captureSelection()) {
+            selectionKept = true
+            epub?.clearSelection()
+        }
+        epubScroll = scroll
+        epub?.submitPreferences(EpubPreferences(fontSize = fontSize, scroll = epubScroll))
+        database.mutateSession(sessionId) {
+            it.getJSONObject("preferences").put("epubScroll", epubScroll)
+        }
+        panel.close()
+        updateEpubStatus()
+        applyEpubHighlights()
+    }
+
+    private fun openOriginalPdf() {
+        val uri =
+            FileProvider.getUriForFile(this, "$packageName.sources", File(book.getString("path")))
+        val intent =
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/pdf")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (intent.resolveActivity(packageManager) == null) {
+            Toast.makeText(
+                    this,
+                    "Install a PDF viewer to open the original file.",
+                    Toast.LENGTH_LONG,
+                )
+                .show()
+            return
+        }
+        startActivity(Intent.createChooser(intent, "Open original PDF"))
     }
 
     private fun selectionIsSaved(rows: JSONArray): Boolean =
@@ -525,11 +646,13 @@ class ReaderActivity : AppCompatActivity() {
                 rows.getJSONObject(it).getString("locator") == selectedLocator.toString()
             }
 
-    private fun annotationChanged(row: JSONObject, deleted: Boolean) {
-        if (deleted && selectedLocator?.toString() == row.getString("locator")) {
+    private fun annotationDeleted(row: JSONObject) {
+        if (selectedLocator?.toString() == row.getString("locator")) {
             selectedLocator = null
             selectedQuote = ""
+            selectionKept = false
             database.mutateSession(sessionId) { it.put("selection", JSONObject.NULL) }
+            if (epub != null) updateEpubStatus()
         }
         lifecycleScope.launch { if (epub != null) applyEpubHighlights() else showPdf(pageIndex) }
     }
@@ -541,134 +664,158 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun selectionActions() = lifecycleScope.launch {
-        epub?.currentSelection()?.let {
-            rememberSelection(it.locator.toJSON(), it.locator.text.highlight ?: "")
-        }
+        if (captureSelection()) epub?.clearSelection()
         if (selectedLocator == null) {
             Toast.makeText(this@ReaderActivity, "Long press a passage first.", Toast.LENGTH_SHORT)
                 .show()
             return@launch
         }
-        val choices = mutableListOf("Highlight", "Add note", "Copy", "Look up", "Search Google")
-        if (pdf != null && pageIndex + 1 < pdf!!.pageCount && selectionPrefix == null)
-            choices.add("Extend to next page")
-        AlertDialog.Builder(this@ReaderActivity)
-            .setTitle(selectedQuote.take(100))
-            .setItems(choices.toTypedArray()) { _, which ->
-                when (which) {
-                    0 -> saveAnnotation("")
-                    1 -> addNote()
-                    2 ->
+        applyEpubHighlights()
+        panel.show("Selected passage") {
+            addView(panel.text(selectedQuote.take(280)).apply { maxLines = 3 })
+            panel.addActions(this, "Highlight" to { saveAnnotation("") }, "Add note" to ::addNote)
+            panel.addActions(
+                this,
+                "Copy" to
+                    {
                         (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(
                             ClipData.newPlainText("Readle quote", selectedQuote)
                         )
-                    3 -> {
-                        val intent =
-                            Intent(Intent.ACTION_PROCESS_TEXT)
-                                .setType("text/plain")
-                                .putExtra(Intent.EXTRA_PROCESS_TEXT, selectedQuote)
-                                .putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-                        try {
-                            startActivity(Intent.createChooser(intent, "Look up"))
-                        } catch (_: Exception) {
-                            Toast.makeText(
-                                    this@ReaderActivity,
-                                    "Install a dictionary with Android text actions.",
-                                    Toast.LENGTH_LONG,
-                                )
-                                .show()
+                        panel.close()
+                    },
+                "Open passage" to
+                    {
+                        panel.close()
+                        selectedLocator?.let { locator ->
+                            if (epub != null) Locator.fromJSON(locator)?.let { epub?.go(it) }
+                            else showPdf(locator.getInt("pageIndex"))
+                        }
+                    },
+            )
+            panel.addActions(
+                this,
+                "Look up" to ::lookUpSelection,
+                "Search Google" to ::confirmWebSearch,
+            )
+            addView(
+                panel.action("Clear selection") {
+                    if (epub == null) clearPdfSelection()
+                    else {
+                        epub?.clearSelection()
+                        selectedLocator = null
+                        selectedQuote = ""
+                        selectionKept = false
+                        database.mutateSession(sessionId) { it.put("selection", JSONObject.NULL) }
+                        lifecycleScope.launch {
+                            applyEpubHighlights()
+                            updateEpubStatus()
                         }
                     }
-                    4 ->
-                        AlertDialog.Builder(this@ReaderActivity)
-                            .setTitle("Send selection to Google?")
-                            .setMessage(selectedQuote.take(500))
-                            .setNegativeButton("Cancel", null)
-                            .setPositiveButton("Search") { _, _ ->
-                                startActivity(
-                                    Intent(
-                                        Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(
-                                            "https://www.google.com/search?q=" +
-                                                android.net.Uri.encode(selectedQuote)
-                                        ),
-                                    )
-                                )
-                            }
-                            .show()
-                    5 -> {
-                        pdfPage?.selectToEnd()
-                        selectionPrefix = selectedLocator
-                        selectionPrefixQuote = selectedQuote
-                        showPdf(pageIndex + 1)
-                        Toast.makeText(
-                                this@ReaderActivity,
-                                "Select the ending passage on this page.",
-                                Toast.LENGTH_LONG,
-                            )
-                            .show()
-                    }
+                    panel.close()
                 }
-            }
-            .show()
+            )
+        }
+    }
+
+    private fun lookUpSelection() {
+        val intent =
+            Intent(Intent.ACTION_PROCESS_TEXT)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_PROCESS_TEXT, selectedQuote)
+                .putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+        try {
+            startActivity(Intent.createChooser(intent, "Look up"))
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(
+                    this,
+                    "Install a dictionary with Android text actions.",
+                    Toast.LENGTH_LONG,
+                )
+                .show()
+        }
+    }
+
+    private fun confirmWebSearch() {
+        val quote = selectedQuote
+        panel.show("Send selection to Google?") {
+            addView(panel.text(quote.take(500)))
+            panel.addActions(
+                this,
+                "Cancel" to panel::close,
+                "Search" to
+                    {
+                        panel.close()
+                        startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    "https://www.google.com/search?q=" +
+                                        android.net.Uri.encode(quote)
+                                ),
+                            )
+                        )
+                    },
+            )
+        }
     }
 
     private fun addNote() {
         val input =
             EditText(this).apply {
                 hint = "Your note"
-                minLines = 3
+                minLines = 2
+                maxLines = 5
             }
-        AlertDialog.Builder(this)
-            .setTitle("Note on selection")
-            .setView(input)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ -> saveAnnotation(input.text.toString()) }
-            .show()
+        panel.show("Note on selection") {
+            addView(panel.text(selectedQuote.take(160)).apply { maxLines = 2 })
+            addView(input)
+            panel.addActions(
+                this,
+                "Cancel" to panel::close,
+                "Save" to { saveAnnotation(input.text.toString()) },
+            )
+        }
     }
 
     private fun saveAnnotation(note: String) {
         val locator = selectedLocator ?: return
-        database.annotate(book.getString("id"), locator, selectedQuote, note)
-        selectionPrefix = null
+        database.annotate(sessionId, locator, selectedQuote, note)
+        selectionKept = false
+        if (epub != null) updateEpubStatus()
+        panel.close()
         lifecycleScope.launch { if (epub != null) applyEpubHighlights() else showPdf(pageIndex) }
         Toast.makeText(this, "Saved on this device", Toast.LENGTH_SHORT).show()
     }
 
     private fun showAnnotations() {
-        val rows = database.annotations(book.getString("id"))
-        if (rows.length() == 0) {
-            Toast.makeText(
-                    this,
-                    "Long press a passage to highlight or add a note.",
-                    Toast.LENGTH_LONG,
+        val rows = database.annotations(sessionId)
+        panel.show("This session’s highlights & notes") {
+            if (rows.length() == 0) {
+                addView(panel.text("Long press a passage to highlight or add a note."))
+            } else {
+                addView(
+                    panel.action("Export") {
+                        startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND)
+                                    .setType("text/plain")
+                                    .putExtra(Intent.EXTRA_TEXT, rows.toString(2)),
+                                "Export annotations",
+                            )
+                        )
+                    }
                 )
-                .show()
-            return
-        }
-        val labels =
-            (0 until rows.length()).map {
-                rows.getJSONObject(it).let { row ->
-                    row.getString("quote").take(100) + "\n" + row.getString("note")
+                for (index in 0 until rows.length()) {
+                    val row = rows.getJSONObject(index)
+                    val quote = row.getString("quote").take(100)
+                    val note = row.getString("note").take(80)
+                    val label = if (note.isBlank()) quote else "$quote\n$note"
+                    addView(
+                        panel.action(label) { annotationActions.show(listOf(row.getString("id"))) }
+                    )
                 }
             }
-        AlertDialog.Builder(this)
-            .setTitle("Highlights & notes")
-            .setItems(labels.toTypedArray()) { _, which ->
-                annotationActions.show(listOf(rows.getJSONObject(which).getString("id")))
-            }
-            .setNeutralButton("Export") { _, _ ->
-                startActivity(
-                    Intent.createChooser(
-                        Intent(Intent.ACTION_SEND)
-                            .setType("text/plain")
-                            .putExtra(Intent.EXTRA_TEXT, rows.toString(2)),
-                        "Export annotations",
-                    )
-                )
-            }
-            .setNegativeButton("Close", null)
-            .show()
+        }
     }
 
     private fun showContents() {
@@ -699,9 +846,15 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun findInBook() {
+        if (book.getString("format") == "epub") {
+            val pub = publication
+            if (pub == null) {
+                Toast.makeText(this, "The book is still opening.", Toast.LENGTH_SHORT).show()
+            } else findInEpub(pub)
+            return
+        }
         if (pdfText == null) {
-            Toast.makeText(this, "EPUB text search is pending this spike.", Toast.LENGTH_LONG)
-                .show()
+            Toast.makeText(this, "This PDF has no searchable text.", Toast.LENGTH_SHORT).show()
             return
         }
         val input = EditText(this).apply { hint = "Exact phrase" }
@@ -734,12 +887,108 @@ class ReaderActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun findInEpub(pub: Publication) {
+        val input =
+            EditText(this).apply {
+                hint = "Word or phrase"
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+                isSingleLine = true
+            }
+        val message = panel.text("Search this book on your device.", 14f)
+        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun search() {
+            val query = input.text.toString().trim()
+            if (query.isEmpty()) {
+                input.error = "Enter a word or phrase."
+                return
+            }
+            findJob?.cancel()
+            val keyboard =
+                getSystemService(INPUT_METHOD_SERVICE)
+                    as android.view.inputmethod.InputMethodManager
+            keyboard.hideSoftInputFromWindow(input.windowToken, 0)
+            results.removeAllViews()
+            message.text = "Searching…"
+            findJob = lifecycleScope.launch {
+                try {
+                    val iterator = pub.search(query) ?: error("This book has no searchable text.")
+                    var count = 0
+                    while (count < 100) {
+                        val matches =
+                            iterator.next().getOrElse { error("This book could not be searched.") }
+                                ?: break
+                        for (locator in matches.locators.take(100 - count)) {
+                            count++
+                            val before = locator.text.before.orEmpty().takeLast(45).trimStart()
+                            val after = locator.text.after.orEmpty().take(55).trimEnd()
+                            val excerpt =
+                                (before + locator.text.highlight.orEmpty() + after)
+                                    .replace(Regex("\\s+"), " ")
+                                    .trim()
+                            val chapter = locator.title ?: "Passage"
+                            results.addView(
+                                panel.action("$chapter\n$excerpt") {
+                                    panel.close()
+                                    lifecycleScope.launch {
+                                        if (captureSelection()) {
+                                            selectionKept = true
+                                            epub?.clearSelection()
+                                            applyEpubHighlights()
+                                        }
+                                        epub?.applyDecorations(
+                                            listOf(
+                                                Decoration(
+                                                    "find",
+                                                    locator,
+                                                    Decoration.Style.Highlight(0xFFB5D4DF.toInt()),
+                                                )
+                                            ),
+                                            "find",
+                                        )
+                                        epub?.go(locator, animated = false)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    message.text =
+                        when (count) {
+                            0 -> "No matches found."
+                            1 -> "1 match"
+                            100 -> "Showing the first 100 matches. Refine your search for more."
+                            else -> "$count matches"
+                        }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    message.text = e.message ?: "This book could not be searched."
+                }
+            }
+        }
+        panel.show("Find in book") {
+            addView(input)
+            addView(panel.action("Find text", ::search))
+            addView(message)
+            addView(results)
+        }
+        input.setOnEditorActionListener { _, action, _ ->
+            if (action != android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) false
+            else {
+                search()
+                true
+            }
+        }
+    }
+
     override fun onStop() {
         if (pdf != null) persistPdfPosition()
         super.onStop()
     }
 
     override fun onDestroy() {
+        if (::content.isInitialized) content.removeCallbacks(resizePdf)
+        pdfRenderGeneration++
         pdfPage?.release()
         pdf?.close()
         pdfText?.close()

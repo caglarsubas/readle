@@ -11,6 +11,8 @@ jest.mock(
 
 jest.mock('../src/library', () => ({
   library: {
+    versionName: "0.1.0-spike",
+    buildNumber: "14",
     books: jest.fn(),
     importItems: jest.fn(),
     recentSessions: jest.fn(),
@@ -92,4 +94,15 @@ test('start new session opens the newly created workspace', async () => {
   await press('Start new session');
   expect(bridge.createSession).toHaveBeenCalledWith('book-a');
   expect(bridge.openSession).toHaveBeenCalledWith('session-b');
+});
+
+test('About shows the installed package version and can return to the library', async () => {
+  await press('About');
+  expect(
+    app.root.findAllByType(Text).some(
+      node => node.props.children === 'Version 0.1.0-spike · Build 14',
+    ),
+  ).toBe(true);
+  await press('Close About');
+  expect(app.root.findAllByType(Text).some(node => node.props.children === book.title)).toBe(true);
 });

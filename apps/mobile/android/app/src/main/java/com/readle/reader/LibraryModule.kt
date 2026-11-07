@@ -26,6 +26,15 @@ class LibraryModule(private val context: ReactApplicationContext) :
 
     override fun getName() = "ReadleLibrary"
 
+    override fun getConstants(): Map<String, Any> {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return mapOf(
+            "versionName" to (info.versionName ?: ""),
+            "buildNumber" to
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info).toString(),
+        )
+    }
+
     private fun async(promise: Promise, block: () -> Any?) {
         executor.execute {
             try {
@@ -45,7 +54,11 @@ class LibraryModule(private val context: ReactApplicationContext) :
 
     @ReactMethod
     fun books(promise: Promise) =
-        async(promise) { database.query("SELECT * FROM books ORDER BY title") }
+        async(promise) {
+            database.query(
+                "SELECT * FROM books ORDER BY CASE WHEN format = 'epub' THEN 0 ELSE 1 END, title"
+            )
+        }
 
     @ReactMethod
     fun sessions(bookId: String, promise: Promise) = async(promise) { database.sessions(bookId) }

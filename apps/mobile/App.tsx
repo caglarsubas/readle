@@ -74,6 +74,7 @@ function LibraryScreen() {
   const [recent, setRecent] = useState<Session[]>([]);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [tab, setTab] = useState<'library' | 'continue'>('library');
+  const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
@@ -125,10 +126,20 @@ function LibraryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
       <View style={styles.header}>
         <Text style={styles.brand}>readle</Text>
-        <Text style={styles.edition}>READER SPIKE · 0.1</Text>
+        <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        {selected ? (
+        {about ? (
+          <>
+            <Text style={styles.heading}>About Readle</Text>
+            <Text style={styles.body}>
+              {library?.versionName
+                ? `Version ${library.versionName} · Build ${library.buildNumber}`
+                : 'Version unavailable'}
+            </Text>
+            <Text style={styles.body}>Read and keep notes in your own book sessions.</Text>
+          </>
+        ) : selected ? (
           <>
             <Pressable
               accessibilityRole="button"
@@ -138,11 +149,11 @@ function LibraryScreen() {
               <Text style={styles.link}>‹ Library</Text>
             </Pressable>
             <Text style={styles.eyebrow}>
-              {selected.format.toUpperCase()} · STORED ON THIS DEVICE
+              {selected.format === 'pdf' ? 'PDF SOURCE' : 'EPUB READER'} · STORED ON THIS DEVICE
             </Text>
             <Text style={styles.heading}>{selected.title}</Text>
             <Text style={styles.body}>
-              Pick up a session or begin somewhere new.
+              Resume your work, or start with a blank workspace.
             </Text>
             {!busy && (
               <View style={styles.actions}>
@@ -226,7 +237,7 @@ function LibraryScreen() {
                       Make room for a good idea.
                     </Text>
                     <Text style={styles.body}>
-                      Import a PDF or EPUB, or try the original Readle sample.
+                      Import an EPUB to read, or a PDF to keep as an original source.
                       Everything in this build stays on your device.
                     </Text>
                   </View>
@@ -255,7 +266,7 @@ function LibraryScreen() {
                     <View style={styles.grow}>
                       <Text style={styles.rowTitle}>{book.title}</Text>
                       <Text style={styles.meta}>
-                        {book.format.toUpperCase()} · Available offline
+                        {book.format === 'pdf' ? 'PDF · Source/reference' : 'EPUB · Reader'} · Available offline
                       </Text>
                       <Text style={styles.link}>View sessions →</Text>
                     </View>
@@ -322,7 +333,7 @@ function LibraryScreen() {
           </Text>
         )}
         <Text style={styles.footer}>
-          Read and annotate offline. Learning and AI arrive in later milestones.
+          Each new session starts without notes or highlights from other sessions.
         </Text>
       </ScrollView>
     </SafeAreaView>

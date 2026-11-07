@@ -18,19 +18,56 @@ User reports and local engineering checks are recorded separately. A checklist p
 
 Build 10 APK SHA-256: `4e1b450bdcf999e7c60b4b628b1cd72f32eb2a540c112f687bb628bfd35bf465`.
 
-## Build 11 — feedback increment — physical acceptance pending
+## Build 11 — owner feedback — 2026-11-05
+
+Device remains Samsung Z Fold7 / Android 17. This is a user report, distinct from the earlier green local/CI checks.
+
+| Topic | Observed / decision |
+|---|---|
+| New sessions | Old notes/highlights appear. Owner now requires a blank workspace; this supersedes the earlier book-shared annotation contract. |
+| PDF deselection | A short tap outside a selected word cannot clear it. Defect. |
+| PDF zoom | Raw coordinate magnification makes the page unfit to the screen. Reader UX rejected. |
+| Cross-page highlighting | Owner confirms the problem occurs in EPUB as well as PDF. |
+| PDF folding | Owner reports duplicated pages after unfolding the Z Fold7. Physical fold gate failed. |
+| Format direction | Owner selected **EPUB-first; PDF for source/reference**. |
+| Decision | Do not mark build 11 reader acceptance complete. Apply B01b / ADR 022 and 023 in build 12. |
+
+## Build 12 — owner feedback — 2026-11-05
 
 | Field | Recorded evidence |
 |---|---|
 | Intended device | Same Z Fold7 / Android 17 |
-| Installation | Update over build 10 using the same UAT signing identity and application ID |
-| Expected | Saved highlight actions in PDF and EPUB, source-preserving note edits, confirmed deletion, PDF pinch/double-tap and both scroll axes restored |
-| Observed on physical phone | Pending owner report for build 11 |
-| Checklist | UAT-12 upgrade retention and FB-01..05 in [ANDROID_UAT.md](ANDROID_UAT.md) |
-| Engineering evidence | See [READER_SPIKE_STATUS.md](READER_SPIKE_STATUS.md). Emulator and automated results remain separate from this physical record. |
+| Installation | Update over build 11 using the same signer and application ID |
+| Expected | Blank new sessions, isolated annotations, preserved old work, EPUB continuous scroll/cross-screen ranges, PDF deselection and one fit-width source page through folding |
+| Observed on physical phone | Owner reports all other items passed. B12-01/02/03/05/06/07 accepted on that basis. B12-04 fails when trying to move the viewport with a native selection active. |
+| Checklist | B12-01..07 in [ANDROID_UAT.md](ANDROID_UAT.md) |
+| Engineering evidence | [READER_SPIKE_STATUS.md](READER_SPIKE_STATUS.md); emulator/automated checks remain separate from the physical record |
+
+## Build 13 — owner feedback — 2026-11-06
+
+Device: Samsung Z Fold7 / Android 17, as previously reported. These are physical observations, separate from the build-13 Pixel 7 and Pixel Fold API 36 emulator passes.
+
+| Topic | Owner observation / follow-up |
+|---|---|
+| About | No way to see which version is installed. Show the installed version and build number. |
+| EPUB layout | Continuous scroll and Pages both feel paginated. Make the gestures and chapter transitions distinct. |
+| Handle drag | Forward page extension works. Previous-page extension fails. Retest backward on both screens. |
+| Page turns with a selection | The selected passage is lost. Preserve it in the session when navigating away and back. |
+| Notes and selection | The dialogs feel separate from the app. Keep their controls and editing inside the reader. |
+| Find | EPUB shows a pending-spike message. Search the book on device and open matching passages. |
+
+Forward extension was reported working. The report does not establish a pass for the other build-13 checks. Build 14 addresses these observations under B01d; physical acceptance remains pending.
+
+## Build 14 — Android Studio visual review — 2026-11-07
+
+At the owner's request, operated the installed build through the existing Android Studio application's visible Pixel 7 and Pixel Fold API 36 emulators. [Full observations and screenshots](BUILD_14_VISUAL_REVIEW.md) distinguish the exercised subchecks from blocked or untested ones.
+
+About, vertical scrolling with a selected word, in-reader note save/reopen, forward/backward horizontal page swipes, retained quotes and Find results were observed working. Active selection handles disappear after ordinary page turns (VIS14-01); retaining the quote alone does not complete the requested adjustable selection interaction. The device Back control left Notes open while its Close button worked (VIS14-02). Held-edge turns were not qualified with the available drag input. Folding reached an Android lock screen that the available gestures did not dismiss, leaving cover/restoration testing blocked. No physical Z Fold7 acceptance or complete B14 pass is recorded.
+
+Future reader handoffs require a recorded visual Android Studio gesture review alongside automated checks. Build 14's full interaction acceptance remains open.
 
 ## Open evidence and rollback
 
-Native iOS integration and physical iOS/iPadOS checks remain pending. Full TalkBack/VoiceOver journeys, continuous PDF cross-page dragging, large-book coverage and named-hardware p95 timing remain open. Cover/inner display transitions in build 11 require the Z Fold7 feedback check even when emulator resizing passes.
+Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Build-12 physical Z Fold7 fold/unfold was accepted in the owner report. Native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending. EPUB selection gesture acceptance remains open.
 
-Build 11 retains SQLite schema 1 and the existing book/session/annotation IDs. Keep the installed app and its storage during updates. To roll back code while retaining data, rebuild the previous source with the same signer and a new, higher version code. Uninstalling or clearing app storage removes the local library and sessions. The current annotation export is not a full library/session backup.
+Build 12 migrates SQLite schema 1 to 2. Previously shared annotations are preserved as independent copies in already-existing sessions. New sessions start empty. Existing source files and reading/session state are retained. Rollback requires a schema-2-compatible fix-forward APK with the same signer and a higher version code. Do not install a schema-1 build over this database. Uninstalling or clearing storage removes the local library; annotation export is not a full backup.

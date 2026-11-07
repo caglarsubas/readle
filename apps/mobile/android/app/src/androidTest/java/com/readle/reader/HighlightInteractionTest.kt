@@ -25,7 +25,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Exercises the real reader, native touch dispatch, dialogs, and existing SQLite schema. */
+/** Exercises the real reader, native touch dispatch, reader panels, and existing SQLite schema. */
 @RunWith(AndroidJUnit4::class)
 class HighlightInteractionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -72,7 +72,7 @@ class HighlightInteractionTest {
         sessionId = database.createSession(bookId).getString("id")
         annotationId =
             database.annotate(
-                bookId,
+                sessionId,
                 locator,
                 "A stable anchor identifies the passage",
                 "Original UI note",
@@ -119,28 +119,9 @@ class HighlightInteractionTest {
     }
 
     @Test
-    fun tapHighlightAfterZoomEditsAndDeletesTheSameObject() {
+    fun pdfHighlightEditsAndDeletesTheSameSessionObject() {
         launchPdf()
-        val originalLocator = database.annotation(bookId, annotationId)!!.getString("locator")
-        doubleTap()
-        waitUntil { zoom() > 1.5 }
-        waitForPdfPage()
-        scenario!!.onActivity {
-            findView(it.window.decorView, PdfViewport::class.java)!!.scrollTo(201, 0)
-            findView(it.window.decorView, android.widget.ScrollView::class.java)!!.scrollTo(0, 303)
-        }
-        scenario!!.recreate()
-        waitForPdfPage()
-        waitUntil {
-            var restored = false
-            scenario!!.onActivity {
-                restored =
-                    findView(it.window.decorView, PdfViewport::class.java)!!.scrollX == 201 &&
-                        findView(it.window.decorView, android.widget.ScrollView::class.java)!!
-                            .scrollY == 303
-            }
-            restored
-        }
+        val originalLocator = database.annotation(sessionId, annotationId)!!.getString("locator")
         tapHighlight()
         click("Edit note")
         val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }
@@ -155,17 +136,17 @@ class HighlightInteractionTest {
         )
         click("Save")
         waitUntil {
-            database.annotation(bookId, annotationId)?.getString("note") == "Edited from object"
+            database.annotation(sessionId, annotationId)?.getString("note") == "Edited from object"
         }
         assertEquals(
             originalLocator,
-            database.annotation(bookId, annotationId)!!.getString("locator"),
+            database.annotation(sessionId, annotationId)!!.getString("locator"),
         )
-        assertEquals(1, database.annotations(bookId).length())
+        assertEquals(1, database.annotations(sessionId).length())
         tapHighlight()
         click("Delete highlight")
         click("Delete")
-        waitUntil { database.annotation(bookId, annotationId) == null }
+        waitUntil { database.annotation(sessionId, annotationId) == null }
         assertEquals(
             0,
             JSONObject(database.session(sessionId).getString("state"))
@@ -175,72 +156,78 @@ class HighlightInteractionTest {
     }
 
     @Test
-    fun pinchCommitsZoomAndAccessibilityCanActivateSavedObject() {
+    fun pdfSelectionClearsOnOutsideTapAndFitsOneSurfaceAfterResize() {
         launchPdf()
-        scenario!!.onActivity { activity ->
-            val viewport = findView(activity.window.decorView, PdfViewport::class.java)!!
-            val time = SystemClock.uptimeMillis()
-            fun event(action: Int, elapsed: Long, positions: List<Pair<Float, Float>>) {
-                val properties =
-                    positions.indices
-                        .map { index ->
-                            MotionEvent.PointerProperties().apply {
-                                id = index
-                                toolType = MotionEvent.TOOL_TYPE_FINGER
-                            }
-                        }
-                        .toTypedArray()
-                val coordinates =
-                    positions
-                        .map { (x, y) ->
-                            MotionEvent.PointerCoords().apply {
-                                this.x = x
-                                this.y = y
-                                pressure = 1f
-                                size = 1f
-                            }
-                        }
-                        .toTypedArray()
-                val input =
-                    MotionEvent.obtain(
-                        time,
-                        time + elapsed,
-                        action,
-                        positions.size,
-                        properties,
-                        coordinates,
-                        0,
-                        0,
-                        1f,
-                        1f,
-                        0,
-                        0,
-                        android.view.InputDevice.SOURCE_TOUCHSCREEN,
-                        0,
-                    )
-                viewport.dispatchTouchEvent(input)
-                input.recycle()
-            }
-            event(MotionEvent.ACTION_DOWN, 0, listOf(100f to 300f))
-            event(
-                MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-                30,
-                listOf(100f to 300f, 400f to 300f),
-            )
-            event(MotionEvent.ACTION_MOVE, 70, listOf(90f to 300f, 440f to 300f))
-            event(MotionEvent.ACTION_MOVE, 110, listOf(80f to 300f, 530f to 300f))
-            event(MotionEvent.ACTION_MOVE, 150, listOf(70f to 300f, 620f to 300f))
-            event(
-                MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
-                190,
-                listOf(70f to 300f, 620f to 300f),
-            )
-            event(MotionEvent.ACTION_UP, 210, listOf(70f to 300f))
-        }
-        waitUntil { zoom() > 1.1 }
+        var pageIdentity: PdfPageView? = null
         scenario!!.onActivity { activity ->
             val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            pageIdentity = page
+            assertEquals((page.parent as View).width, page.width)
+            val time = SystemClock.uptimeMillis()
+            val input =
+                MotionEvent.obtain(
+                    time,
+                    time,
+                    MotionEvent.ACTION_DOWN,
+                    page.width * 100f / 432f,
+                    page.height * 124f / 648f,
+                    0,
+                )
+            page.dispatchTouchEvent(input)
+            input.recycle()
+        }
+        SystemClock.sleep(650)
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val time = SystemClock.uptimeMillis()
+            val input =
+                MotionEvent.obtain(
+                    time - 650,
+                    time,
+                    MotionEvent.ACTION_UP,
+                    page.width * 100f / 432f,
+                    page.height * 124f / 648f,
+                    0,
+                )
+            page.dispatchTouchEvent(input)
+            input.recycle()
+        }
+        waitUntil {
+            !JSONObject(database.session(sessionId).getString("state")).isNull("selection")
+        }
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val time = SystemClock.uptimeMillis()
+            for ((action, elapsed) in
+                listOf(MotionEvent.ACTION_DOWN to 0L, MotionEvent.ACTION_UP to 30L)) {
+                val input =
+                    MotionEvent.obtain(time, time + elapsed, action, page.width * .9f, 20f, 0)
+                page.dispatchTouchEvent(input)
+                input.recycle()
+            }
+        }
+        waitUntil { JSONObject(database.session(sessionId).getString("state")).isNull("selection") }
+        // Exercise the same content-width callback used by a fold/unfold without depending on an
+        // AVD.
+        scenario!!.onActivity { activity ->
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+            val content = page.parent.parent as View
+            content.layoutParams.width = (content.width * .7f).toInt()
+            content.requestLayout()
+        }
+        waitUntil {
+            var fits = false
+            scenario!!.onActivity { activity ->
+                val page = findView(activity.window.decorView, PdfPageView::class.java)!!
+                fits = page.width == (page.parent.parent as View).width
+            }
+            fits
+        }
+        scenario!!.onActivity { activity ->
+            assertSame(pageIdentity, findView(activity.window.decorView, PdfPageView::class.java))
+            assertEquals(1, countPages(activity.window.decorView))
             val info = AccessibilityNodeInfo.obtain()
+            val page = findView(activity.window.decorView, PdfPageView::class.java)!!
             page.onInitializeAccessibilityNodeInfo(info)
             val action =
                 info.actionList.single {
@@ -250,7 +237,12 @@ class HighlightInteractionTest {
             info.recycle()
         }
         waitForNode { it.text?.toString() == "Copy quote" }
-        assertEquals(1, database.annotations(bookId).length())
+    }
+
+    private fun countPages(view: View): Int {
+        if (view is PdfPageView) return 1
+        if (view !is ViewGroup) return 0
+        return (0 until view.childCount).sumOf { countPages(view.getChildAt(it)) }
     }
 
     @Test
@@ -266,7 +258,7 @@ class HighlightInteractionTest {
                     JSONObject().put("highlight", "A stable anchor identifies the passage"),
                 ),
         )
-        val originalLocator = database.annotation(bookId, annotationId)!!.getString("locator")
+        val originalLocator = database.annotation(sessionId, annotationId)!!.getString("locator")
         tapEpubHighlight()
         click("Edit note")
         click("Cancel")
@@ -287,12 +279,500 @@ class HighlightInteractionTest {
             )
         tapEpubHighlight()
         click("Delete highlight")
-        click("Keep")
+        assertTrue(
+            waitForNode { it.text?.toString() == "Keep" }
+                .performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        )
         assertEquals(
             originalLocator,
-            database.annotation(bookId, annotationId)!!.getString("locator"),
+            database.annotation(sessionId, annotationId)!!.getString("locator"),
         )
-        assertEquals(1, database.annotations(bookId).length())
+        assertEquals(1, database.annotations(sessionId).length())
+    }
+
+    @Test
+    fun multiScreenEpubRangePersistsAndNewSessionStartsBlank() {
+        launchFixture(
+            "epub",
+            JSONObject()
+                .put("href", "EPUB/c0.xhtml")
+                .put("type", "application/xhtml+xml")
+                .put("locations", JSONObject().put("cssSelector", "html > body > p:nth-of-type(1)"))
+                .put(
+                    "text",
+                    JSONObject().put("highlight", "A stable anchor identifies the passage"),
+                ),
+        )
+        tapEpubHighlight()
+        click("Close")
+        database.deleteAnnotation(sessionId, annotationId)
+        val selected =
+            evaluateEpub(
+                """
+                (function() {
+                    const ps = document.querySelectorAll('p');
+                    const r = document.createRange();
+                    r.setStart(ps[0].firstChild, 2); r.setEnd(ps[5].firstChild, 38);
+                    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+                    return r.getBoundingClientRect().height > innerHeight;
+                })()
+                """
+                    .trimIndent()
+            )
+        assertEquals("true", selected)
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 1 }
+        val saved = database.annotations(sessionId).getJSONObject(0)
+        assertTrue(saved.getString("quote").length > 800)
+        val original = sessionId
+        scenario!!.close()
+        sessionId = database.createSession(bookId).getString("id")
+        scenario =
+            ActivityScenario.launch(
+                Intent(context, ReaderActivity::class.java).putExtra("sessionId", sessionId)
+            )
+        waitUntil { evaluateEpub("!!document.querySelector('p')") == "true" }
+        assertEquals(0, database.annotations(sessionId).length())
+        assertEquals(
+            "0",
+            evaluateEpub("document.querySelectorAll('[data-group=readle] [data-style]').length"),
+        )
+        scenario!!.close()
+        sessionId = original
+        scenario =
+            ActivityScenario.launch(
+                Intent(context, ReaderActivity::class.java).putExtra("sessionId", sessionId)
+            )
+        waitUntil {
+            evaluateEpub(
+                "window.readium && readium.getDecorations('readle').items.some(i => i.decoration.id === " +
+                    JSONObject.quote(saved.getString("id")) +
+                    ")"
+            ) == "true"
+        }
+        assertEquals(
+            saved.getString("locator"),
+            database.annotations(sessionId).getJSONObject(0).getString("locator"),
+        )
+        assertTrue(
+            JSONObject(database.session(sessionId).getString("state"))
+                .getJSONObject("preferences")
+                .getBoolean("epubScroll")
+        )
+    }
+
+    @Test
+    fun nativeSelectionSurvivesFingerScrollInContinuousLayout() {
+        launchEpubForGestures()
+        longPressEpubWord()
+        val selected = evaluateEpub("getSelection().toString()")
+        val before = webScrollXy().second
+        val bounds = webScreenBounds()
+        dragTouch(
+            bounds.exactCenterX(),
+            bounds.top + bounds.height() * .8f,
+            bounds.exactCenterX(),
+            bounds.top + bounds.height() * .3f,
+            600,
+        )
+        waitUntil { webScrollXy().second > before + 100 }
+        assertEquals(selected, evaluateEpub("getSelection().toString()"))
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 2 }
+        assertTrue(
+            (0 until 2).any {
+                database.annotations(sessionId).getJSONObject(it).getString("quote") == "appearance"
+            }
+        )
+    }
+
+    @Test
+    fun nativeEndHandleAutoScrollsDownInContinuousLayout() {
+        launchEpubForGestures()
+        longPressEpubWord()
+        val before = webScrollXy().second
+        val bounds = webScreenBounds()
+        val handle = selectionHandle(false)
+        dragTouch(handle.first, handle.second, handle.first, bounds.bottom - 4f, 1800)
+        waitUntil { webScrollXy().second > before + 100 }
+        val quote = JSONArray("[" + evaluateEpub("getSelection().toString()") + "]").getString(0)
+        assertTrue(quote.startsWith("appearance"))
+        assertTrue(quote.length > 100)
+        val stoppedAt = webScrollXy().second
+        SystemClock.sleep(1200)
+        assertEquals("Scroll continued after handle release", stoppedAt, webScrollXy().second)
+    }
+
+    @Test
+    fun nativeEndHandleTurnsNextPageAndSavesItsExtendedRange() {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        val fontBefore = epubFontSize()
+        repeat(4) { click("Text +") }
+        waitUntil { epubFontSize() > fontBefore * 1.5 }
+        longPressEpubWord()
+        val before = webScrollXy().first
+        val bounds = webScreenBounds()
+        val handle = selectionHandle(false)
+        captureGesture("end-before")
+        dragTouch(handle.first, handle.second, bounds.right - 4f, handle.second, 1800)
+        captureGesture("end-after")
+        waitUntil { webScrollXy().first > before + bounds.width() * .8 }
+        assertTrue(evaluateEpub("getSelection().toString().length").toInt() > 50)
+        val stoppedAt = webScrollXy().first
+        val stoppedQuote = evaluateEpub("getSelection().toString()")
+        SystemClock.sleep(1400)
+        assertEquals("Page kept turning after finger release", stoppedAt, webScrollXy().first)
+        assertEquals(stoppedQuote, evaluateEpub("getSelection().toString()"))
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 2 }
+        val row =
+            (0 until 2)
+                .map { database.annotations(sessionId).getJSONObject(it) }
+                .single { it.getString("quote").length > 50 }
+        assertTrue(row.getString("quote").startsWith("appearance"))
+        val locator = row.getString("locator")
+        scenario!!.recreate()
+        waitUntil { evaluateEpub("!!document.querySelector('p')") == "true" }
+        assertEquals(
+            locator,
+            database.annotation(sessionId, row.getString("id"))!!.getString("locator"),
+        )
+        val expectedText = row.getString("quote").replace(Regex("\\s+"), "")
+        var rendered = "null"
+        waitUntil {
+            rendered =
+                evaluateEpub(
+                    """
+                (function() {
+                    if (!window.readium) return null;
+                    const item = readium.getDecorations('readle').items.find(i => i.decoration.id === ${JSONObject.quote(row.getString("id"))});
+                    return item ? item.range.toString().replace(/\s/g, '') : null;
+                })()
+            """
+                        .trimIndent()
+                )
+            rendered != "null"
+        }
+        assertEquals(expectedText, JSONArray("[" + rendered + "]").getString(0))
+    }
+
+    @Test
+    fun nativeStartHandleTurnsPreviousPageAndKeepsTheEndAnchor() {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        click("Next")
+        waitUntil { webScrollXy().first > 100 }
+        longPressEpubWord()
+        val before = webScrollXy().first
+        val bounds = webScreenBounds()
+        val handle = selectionHandle(true)
+        captureGesture("start-before")
+        dragTouch(handle.first, handle.second, bounds.left + 4f, handle.second, 1800)
+        captureGesture("start-after")
+        waitUntil { webScrollXy().first < before - bounds.width() * .8 }
+        val quote = JSONArray("[" + evaluateEpub("getSelection().toString()") + "]").getString(0)
+        assertTrue(quote.length > 50)
+        assertTrue(quote.endsWith("appearance"))
+    }
+
+    @Test
+    fun scrollAndPagesHaveDistinctTouchAxesAndScrollContinuesAtChapterEdge() {
+        launchEpubForGestures()
+        val bounds = webScreenBounds()
+        val x = bounds.exactCenterX()
+        val y = bounds.exactCenterY()
+        swipe(x, y + bounds.height() * .25f, x, y - bounds.height() * .25f)
+        waitUntil { webScrollXy().second > 100 }
+        assertEquals(0, webScrollXy().first)
+        assertTrue(evaluateEpub("location.pathname").contains("c0.xhtml"))
+        // Move to the bottom, allowing the native viewport to catch up to the DOM.
+        // Chromium can still be finishing the first fling when scrollTo returns.
+        waitUntil {
+            evaluateEpub("scrollTo(0, document.scrollingElement.scrollHeight)")
+            var atEnd = false
+            scenario!!.onActivity { activity ->
+                val web = findVisibleWebView(activity.window.decorView)!!
+                atEnd = !web.canScrollVertically(1)
+            }
+            atEnd
+        }
+        swipe(x, y + bounds.height() * .25f, x, y - bounds.height() * .25f)
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil { webScrollXy().second < 10 }
+        swipe(x, y - bounds.height() * .25f, x, y + bounds.height() * .25f)
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        waitUntil { webScrollXy().second > 100 }
+
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        click("Contents")
+        click("1. A place for an idea")
+        waitUntil { webScrollXy().first == 0 }
+        swipe(bounds.right - bounds.width() * .15f, y, bounds.left + bounds.width() * .15f, y)
+        waitUntil { webScrollXy().first > 100 }
+        assertEquals(0, webScrollXy().second)
+        click("Layout")
+        click("Continuous scroll")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollHeight > innerHeight * 1.5") == "true"
+        }
+        assertEquals(0, webScrollXy().first)
+    }
+
+    @Test
+    fun previousNextAndHorizontalSwipesKeepTheSelectedPassage() {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        longPressEpubWord()
+        click("Next")
+        waitUntil { webScrollXy().first > 100 }
+        waitUntil { selectionState()?.optString("quote") == "appearance" }
+        val held = selectionState()!!.getJSONObject("locator").toString()
+        click("Previous")
+        waitUntil { webScrollXy().first == 0 }
+        assertEquals(held, selectionState()!!.getJSONObject("locator").toString())
+        click("Selection")
+        click("Add note")
+        scenario!!.onActivity { reader ->
+            assertNotNull(findView(reader.window.decorView, android.widget.EditText::class.java))
+        }
+        val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }
+        editor.performAction(
+            AccessibilityNodeInfo.ACTION_SET_TEXT,
+            Bundle().apply {
+                putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    "Kept through page turns",
+                )
+            },
+        )
+        click("Save")
+        waitUntil {
+            (0 until database.annotations(sessionId).length()).any {
+                database.annotations(sessionId).getJSONObject(it).getString("note") ==
+                    "Kept through page turns"
+            }
+        }
+
+        longPressEpubWord("changes")
+        val bounds = webScreenBounds()
+        swipe(
+            bounds.right - bounds.width() * .15f,
+            bounds.exactCenterY(),
+            bounds.left + bounds.width() * .15f,
+            bounds.exactCenterY(),
+        )
+        waitUntil { webScrollXy().first > 100 }
+        waitUntil { selectionState()?.optString("quote") == "changes" }
+        click("Selection")
+        click("Open passage")
+        waitUntil { webScrollXy().first == 0 }
+    }
+
+    @Test
+    fun epubFindShowsNoMatchesThenOpensTheMatchingChapterAndQuote() {
+        launchEpubForGestures()
+        click("Find")
+        fun setQuery(query: String) {
+            waitForNode { it.className?.toString() == "android.widget.EditText" }
+                .performAction(
+                    AccessibilityNodeInfo.ACTION_SET_TEXT,
+                    Bundle().apply {
+                        putCharSequence(
+                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                            query,
+                        )
+                    },
+                )
+            click("Find text")
+        }
+        setQuery("zzzxq-not-a-word")
+        waitForNode { it.text?.toString() == "No matches found." }
+        setQuery("hypothetical linear response")
+        val result = waitForNode {
+            it.className?.toString() == "android.widget.Button" &&
+                it.text?.toString()?.contains("hypothetical linear response.") == true &&
+                it.isVisibleToUser
+        }
+        assertTrue(result.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil {
+            evaluateEpub(
+                """readium.getDecorations('find').items.some(item => item.range.toString() === 'hypothetical linear response')"""
+            ) == "true"
+        }
+        val quoteY =
+            evaluateEpub(
+                    """readium.getDecorations('find').items[0].range.getBoundingClientRect().top"""
+                )
+                .toDouble()
+        assertTrue(quoteY >= 0)
+        assertTrue(quoteY < evaluateEpub("innerHeight").toDouble())
+    }
+
+    private fun selectionState(): JSONObject? =
+        JSONObject(database.session(sessionId).getString("state")).optJSONObject("selection")
+
+    private fun swipe(x: Float, y: Float, endX: Float, endY: Float) {
+        val down = SystemClock.uptimeMillis()
+        sendTouch(MotionEvent.ACTION_DOWN, down, x, y)
+        for (step in 1..12) {
+            val f = step / 12f
+            sendTouch(MotionEvent.ACTION_MOVE, down, x + (endX - x) * f, y + (endY - y) * f)
+            SystemClock.sleep(15)
+        }
+        sendTouch(MotionEvent.ACTION_UP, down, endX, endY)
+    }
+
+    private fun captureGesture(name: String) {
+        File(context.getExternalFilesDir(null), "gesture-$name.png").outputStream().use {
+            instrumentation.uiAutomation
+                .takeScreenshot()
+                ?.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        android.util.Log.i(
+            "ReadleGesture",
+            "$name: " +
+                evaluateEpub(
+                    "JSON.stringify({selection:getSelection().toString(),x:scrollX,y:scrollY})"
+                ),
+        )
+    }
+
+    private fun launchEpubForGestures() {
+        launchFixture(
+            "epub",
+            JSONObject()
+                .put("href", "EPUB/c0.xhtml")
+                .put("type", "application/xhtml+xml")
+                .put("locations", JSONObject().put("cssSelector", "html > body > p:nth-of-type(1)"))
+                .put(
+                    "text",
+                    JSONObject().put("highlight", "A stable anchor identifies the passage"),
+                ),
+        )
+        waitUntil { evaluateEpub("!!document.querySelector('p')") == "true" }
+    }
+
+    private fun webScreenBounds(): android.graphics.Rect {
+        val bounds = android.graphics.Rect()
+        scenario!!.onActivity { activity ->
+            findVisibleWebView(activity.window.decorView)!!.getGlobalVisibleRect(bounds)
+        }
+        return bounds
+    }
+
+    private fun webScrollXy(): Pair<Int, Int> {
+        var position = 0 to 0
+        scenario!!.onActivity { activity ->
+            findVisibleWebView(activity.window.decorView)!!.let {
+                position = it.scrollX to it.scrollY
+            }
+        }
+        return position
+    }
+
+    private fun screenPoint(css: String): Pair<Float, Float> {
+        val xy = JSONArray(evaluateEpub(css))
+        val bounds = webScreenBounds()
+        val density = context.resources.displayMetrics.density
+        return bounds.left + xy.getDouble(0).toFloat() * density to
+            bounds.top + xy.getDouble(1).toFloat() * density
+    }
+
+    private fun longPressEpubWord(word: String = "appearance") {
+        val point =
+            screenPoint(
+                """
+                (function() {
+                    for (const p of document.querySelectorAll('p')) {
+                        const n = p.firstChild; const at = n.textContent.indexOf(${JSONObject.quote(word)});
+                        if (at < 0) continue;
+                        const r = document.createRange(); r.setStart(n, at); r.setEnd(n, at + ${word.length});
+                        const b = r.getBoundingClientRect();
+                        if (b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight)
+                            return [b.left + b.width/2, b.top + b.height/2];
+                    }
+                    return null;
+                })()
+                """
+                    .trimIndent()
+            )
+        val down = SystemClock.uptimeMillis()
+        sendTouch(MotionEvent.ACTION_DOWN, down, point.first, point.second)
+        SystemClock.sleep(750)
+        sendTouch(MotionEvent.ACTION_UP, down, point.first, point.second)
+        waitUntil { evaluateEpub("getSelection().toString().trim()") == JSONObject.quote(word) }
+    }
+
+    private fun selectionHandle(start: Boolean) =
+        screenPoint(
+            """
+        (function() {
+            const r = getSelection().getRangeAt(0).cloneRange(); r.collapse($start);
+            const b = r.getBoundingClientRect();
+            return [b.left, b.bottom + 10];
+        })()
+    """
+                .trimIndent()
+        )
+
+    private fun sendTouch(action: Int, down: Long, x: Float, y: Float) {
+        val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+        event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+        instrumentation.sendPointerSync(event)
+        event.recycle()
+    }
+
+    private fun dragTouch(x: Float, y: Float, endX: Float, endY: Float, duration: Int) {
+        val down = SystemClock.uptimeMillis()
+        sendTouch(MotionEvent.ACTION_DOWN, down, x, y)
+        for (step in 1..60) {
+            val fraction = (step / 20f).coerceAtMost(1f)
+            sendTouch(
+                MotionEvent.ACTION_MOVE,
+                down,
+                x + (endX - x) * fraction,
+                y + (endY - y) * fraction,
+            )
+            SystemClock.sleep((duration / 60).toLong())
+        }
+        sendTouch(MotionEvent.ACTION_UP, down, endX, endY)
+    }
+
+    private fun evaluateEpub(script: String): String {
+        var value = "null"
+        val completed = CountDownLatch(1)
+        scenario!!.onActivity { activity ->
+            val web = findVisibleWebView(activity.window.decorView)
+            if (web == null) completed.countDown()
+            else
+                web.evaluateJavascript(script) {
+                    value = it
+                    completed.countDown()
+                }
+        }
+        assertTrue(completed.await(2, TimeUnit.SECONDS))
+        return value
     }
 
     private fun epubFontSize(): Double {
@@ -380,29 +860,6 @@ class HighlightInteractionTest {
         }
     }
 
-    private fun zoom() =
-        JSONObject(database.session(sessionId).getString("state"))
-            .getJSONObject("preferences")
-            .getDouble("pdfZoom")
-
-    private fun doubleTap() {
-        scenario!!.onActivity { activity ->
-            val viewport = findView(activity.window.decorView, PdfViewport::class.java)!!
-            val time = SystemClock.uptimeMillis()
-            for ((action, elapsed) in
-                listOf(
-                    MotionEvent.ACTION_DOWN to 0L,
-                    MotionEvent.ACTION_UP to 30L,
-                    MotionEvent.ACTION_DOWN to 120L,
-                    MotionEvent.ACTION_UP to 150L,
-                )) {
-                val event = MotionEvent.obtain(time, time + elapsed, action, 350f, 350f, 0)
-                viewport.dispatchTouchEvent(event)
-                event.recycle()
-            }
-        }
-    }
-
     private fun tapHighlight() {
         waitForPdfPage()
         instrumentation.waitForIdleSync()
@@ -426,14 +883,40 @@ class HighlightInteractionTest {
 
     private fun click(label: String) {
         instrumentation.waitForIdleSync()
+        val bounds = android.graphics.Rect()
         waitUntil {
-            var node =
+            val node =
                 findNode(instrumentation.uiAutomation.rootInActiveWindow) {
-                    it.text?.toString()?.equals(label, ignoreCase = true) == true
+                    it.text?.toString()?.equals(label, ignoreCase = true) == true &&
+                        it.isVisibleToUser
                 }
-            while (node != null && !node.isClickable && node.parent != null) node = node.parent
-            node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+            node?.getBoundsInScreen(bounds)
+            node != null && !bounds.isEmpty
         }
+        val time = SystemClock.uptimeMillis()
+        val down =
+            MotionEvent.obtain(
+                time,
+                time,
+                MotionEvent.ACTION_DOWN,
+                bounds.exactCenterX(),
+                bounds.exactCenterY(),
+                0,
+            )
+        instrumentation.sendPointerSync(down)
+        down.recycle()
+        SystemClock.sleep(50)
+        val up =
+            MotionEvent.obtain(
+                time,
+                SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP,
+                bounds.exactCenterX(),
+                bounds.exactCenterY(),
+                0,
+            )
+        instrumentation.sendPointerSync(up)
+        up.recycle()
         instrumentation.waitForIdleSync()
     }
 
@@ -467,15 +950,19 @@ class HighlightInteractionTest {
     }
 
     private fun findVisibleWebView(view: View): WebView? {
-        if (view is WebView && view.isShown && view.getGlobalVisibleRect(android.graphics.Rect()))
-            return view
-        if (view is ViewGroup)
-            for (index in 0 until view.childCount) {
-                findVisibleWebView(view.getChildAt(index))?.let {
-                    return it
-                }
+        fun candidates(node: View): Sequence<WebView> = sequence {
+            if (node is WebView && node.isShown) yield(node)
+            if (node is ViewGroup)
+                for (index in 0 until node.childCount) yieldAll(candidates(node.getChildAt(index)))
+        }
+        val bounds = android.graphics.Rect()
+        return candidates(view)
+            .mapNotNull {
+                if (it.getGlobalVisibleRect(bounds)) it to bounds.width() * bounds.height()
+                else null
             }
-        return null
+            .maxByOrNull { it.second }
+            ?.first
     }
 
     private fun <T : View> findView(view: View, type: Class<T>): T? {
