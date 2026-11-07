@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-07",
+  "report": "qemu-system-aarch64-2026-11-07-213140.ips",
+  "process": "qemu-system-aarch64",
+  "exception": "EXC_BAD_ACCESS / SIGSEGV",
+  "component": "emulator CrashReporter / HangDetector",
+  "effect": "emulator-5556 disconnected during the second native-input replay",
+  "appCrashInferred": false,
+  "recovery": "Owner manually unlocked Mac; AVD cold booted without wiping data. System UI Wait dismissed its startup ANR. Three consecutive synchronized replays and all 23 native tests subsequently passed.",
+  "laterInterruption": {
+    "report": "qemu-system-aarch64-2026-11-07-215410.ips",
+    "time": "2026-11-07 21:54 +0800",
+    "process": "qemu-system-aarch64",
+    "exception": "EXC_BAD_ACCESS / SIGSEGV",
+    "component": "emulator CrashReporter / HangDetector",
+    "effect": "Pixel 7 exited during an additional UI dump/screenshot after the completed suite and visible saved-note restoration; extra note PNG and final About revisit not captured",
+    "appCrashInferred": false
+  }
+}

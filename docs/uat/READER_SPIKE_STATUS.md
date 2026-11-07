@@ -1,4 +1,14 @@
-# Build 14 reader handoff
+# Build 15 — ready for Android owner UAT
+
+Updated 2026-11-07. Build 15 addresses VIS14-01: ordinary turns preserve the live range and its adjustment handles, while the complete source locator stays independent of the reading page. [Implementation and evidence](BUILD_15_VISUAL_REVIEW.md).
+
+The private standalone APK is `output/android/readle-uat-15.apk`; SHA-256 `06e2f7bfd090d8f0367dbb560945ecc7b919b5a215cb97bd03aab7743e7dc794`. Application ID `com.readle.uat`, signing identity and SQLite schema 2 are unchanged. Install with **Update**, keeping application data. The install helper defaults to build 15; fixtures and [B15-01..07](ANDROID_UAT.md) accompany it.
+
+Engineering qualification passes: 23 native tests on Pixel 7 API 36, three consecutive synchronized swipe-to-handle replays without visual pauses, two native-handle tests per foldable screen with Android Studio observation, the complete-locator regression, nine storage/migration checks, four React Native tests, TypeScript, ESLint, native compilation and signing. Final-APK offline restart visibly retained the phone's two sessions and note; cover → inner → cover retained the foldable note and Pages preference. Earlier failed attempts and two host-emulator interruptions are recorded separately in the report.
+
+Physical Samsung Z Fold7 / Android 17 B15 acceptance, native iOS, accessibility, large-book coverage and named-hardware timings remain open. This handoff does not complete Phase A. Native selection across separate chapters remains open.
+
+## Build 14 handoff history
 
 Updated 2026-11-07. The Z Fold7 owner reported that build 13 extends selections forward but not backward, its two layouts feel alike, ordinary turns lose selections, annotation dialogs feel separate, Find is unavailable in EPUB, and the installed version is not visible. See [the owner record](UAT_RESULTS.md).
 
@@ -19,4 +29,4 @@ The [2026-11-07 Android Studio follow-up](BUILD_14_VISUAL_FOLLOWUP.md), using ow
 
 The app test exercises About using package metadata. Native touch tests distinguish the two layouts, navigate vertical chapter edges, drag both native handles, stop after release, retain a new selection through button/swipe turns, and save/reopen the rendered passage. Tests also exercise the in-reader note editor and search for a passage in a different EPUB chapter, including a no-results query. The private receipt retains exact APK, emulator and CI evidence.
 
-Physical Z Fold7 / Android 17 testing is open. Run [B14-01..07](ANDROID_UAT.md) on both screens, including your own EPUB. Continuous scroll has discrete transitions at chapter boundaries; native range extension across separate resources is still open. Fixed-layout EPUBs stay paginated. Native iOS and named-hardware accessibility and timing gates are separate.
+Physical Z Fold7 / Android 17 testing is open. Historical checklist: [B14-01..07](BUILD_14_CHECKLIST.md) on both screens, including your own EPUB. Continuous scroll has discrete transitions at chapter boundaries; native range extension across separate resources is still open. Fixed-layout EPUBs stay paginated. Native iOS and named-hardware accessibility and timing gates are separate.

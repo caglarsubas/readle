@@ -244,7 +244,7 @@ class ReaderActivity : AppCompatActivity() {
             supportFragmentManager.fragmentFactory =
                 EpubNavigatorFactory(pub)
                     .createFragmentFactory(
-                        initialLocator = initial?.let { Locator.fromJSON(it) },
+                        initialLocator = initial?.let { parseEpubLocator(it) },
                         initialPreferences =
                             EpubPreferences(fontSize = fontSize, scroll = epubScroll),
                         configuration =
@@ -325,8 +325,24 @@ class ReaderActivity : AppCompatActivity() {
             override fun onDestroyActionMode(mode: ActionMode) = Unit
         }
 
+    // Readium 3.1's Locations.fromJSON consumes known fields from its input.
+    // The reader's durable locators must remain intact after rendering or navigation.
+    private fun parseEpubLocator(json: JSONObject): Locator? =
+        Locator.fromJSON(JSONObject(json.toString()))
+
     private fun rememberSelection(locator: JSONObject, quote: String) {
-        selectedLocator = locator
+        val range = locator.optJSONObject("locations")?.optJSONObject("readleRange")
+        // Reading progression can move while this exact source range remains active.
+        // Retain its original locator instead of moving the selection with the viewport.
+        val anchor =
+            selectedLocator?.takeIf {
+                range != null &&
+                    quote == selectedQuote &&
+                    it.optString("href") == locator.optString("href") &&
+                    it.optJSONObject("locations")?.optJSONObject("readleRange")?.toString() ==
+                        range.toString()
+            } ?: locator
+        selectedLocator = anchor
         selectedQuote = quote
         database.mutateSession(sessionId) {
             it.put(
@@ -334,7 +350,7 @@ class ReaderActivity : AppCompatActivity() {
                 JSONObject()
                     .put("sourceVersion", book.getString("sourceVersion"))
                     .put("format", book.getString("format"))
-                    .put("locator", locator)
+                    .put("locator", anchor)
                     .put("quote", quote),
             )
         }
@@ -358,7 +374,7 @@ class ReaderActivity : AppCompatActivity() {
         selectedLocator
             ?.takeUnless { selectionIsSaved(rows) }
             ?.let {
-                Locator.fromJSON(it)?.let { anchor ->
+                parseEpubLocator(it)?.let { anchor ->
                     decorations.add(
                         Decoration(
                             "selection",
@@ -565,7 +581,8 @@ class ReaderActivity : AppCompatActivity() {
             try {
                 if (captureSelection()) {
                     selectionKept = true
-                    navigator.clearSelection()
+                    // Keep Chromium's live range and handles while moving within
+                    // the resource. The session snapshot also survives a chapter turn.
                     applyEpubHighlights()
                 }
                 panel.close()
@@ -659,7 +676,7 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun openAnnotationSource(row: JSONObject) {
         rememberSelection(JSONObject(row.getString("locator")), row.getString("quote"))
-        if (epub != null) Locator.fromJSON(selectedLocator!!)?.let { epub?.go(it) }
+        if (epub != null) parseEpubLocator(selectedLocator!!)?.let { epub?.go(it) }
         else showPdf(selectedLocator!!.getInt("pageIndex"))
     }
 
@@ -687,7 +704,7 @@ class ReaderActivity : AppCompatActivity() {
                     {
                         panel.close()
                         selectedLocator?.let { locator ->
-                            if (epub != null) Locator.fromJSON(locator)?.let { epub?.go(it) }
+                            if (epub != null) parseEpubLocator(locator)?.let { epub?.go(it) }
                             else showPdf(locator.getInt("pageIndex"))
                         }
                     },

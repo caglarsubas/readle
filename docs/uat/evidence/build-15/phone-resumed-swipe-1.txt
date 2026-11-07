@@ -1,0 +1,47 @@
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+com.readle.reader.HighlightInteractionTest:
+INSTRUMENTATION_STATUS: test=nativeSelectionRemainsAdjustableAfterSwipePageTurns
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1154)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:1094)
+	at com.readle.reader.HighlightInteractionTest.checkAdjustableSelectionAfterPageTurns(HighlightInteractionTest.kt:561)
+	at com.readle.reader.HighlightInteractionTest.nativeSelectionRemainsAdjustableAfterSwipePageTurns(HighlightInteractionTest.kt:557)
+
+INSTRUMENTATION_STATUS: stream=
+Error in nativeSelectionRemainsAdjustableAfterSwipePageTurns(com.readle.reader.HighlightInteractionTest):
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1154)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:1094)
+	at com.readle.reader.HighlightInteractionTest.checkAdjustableSelectionAfterPageTurns(HighlightInteractionTest.kt:561)
+	at com.readle.reader.HighlightInteractionTest.nativeSelectionRemainsAdjustableAfterSwipePageTurns(HighlightInteractionTest.kt:557)
+
+INSTRUMENTATION_STATUS: test=nativeSelectionRemainsAdjustableAfterSwipePageTurns
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 10.695
+There was 1 failure:
+1) nativeSelectionRemainsAdjustableAfterSwipePageTurns(com.readle.reader.HighlightInteractionTest)
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1154)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:1094)
+	at com.readle.reader.HighlightInteractionTest.checkAdjustableSelectionAfterPageTurns(HighlightInteractionTest.kt:561)
+	at com.readle.reader.HighlightInteractionTest.nativeSelectionRemainsAdjustableAfterSwipePageTurns(HighlightInteractionTest.kt:557)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

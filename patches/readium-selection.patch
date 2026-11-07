@@ -121,7 +121,44 @@
          override val selectionActionModeCallback: ActionMode.Callback?
              get() = config.selectionActionModeCallback
 
-@@ -911,7 +926,17 @@
+@@ -867,11 +882,28 @@
+                 ?.let { publication.get(it) }
+     }
+
++    // Preserve Chromium's live selection instead of using JavaScript scrolling,
++    // which the paginated column-selection guard intentionally blocks.
++    private fun turnPageWithSelection(forward: Boolean, animated: Boolean): Boolean? {
++        val webView = currentReflowablePageFragment?.webView ?: return null
++        if (settings.value.scroll || !webView.isSelecting) return null
++        val rtl = settings.value.readingProgression == ReadingProgression.RTL
++        val step = if (forward != rtl) 1 else -1
++        val index = webView.mCurItem + step
++        if (index !in 0 until webView.numPages) {
++            return if (forward) goToNextResource(jump = false, animated = animated)
++                else goToPreviousResource(jump = false, animated = animated)
++        }
++        webView.setCurrentItem(index, animated)
++        return true
++    }
++
+     override fun goForward(animated: Boolean): Boolean {
+         if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
+             return goToNextResource(jump = false, animated = animated)
+         }
+
++        turnPageWithSelection(forward = true, animated = animated)?.let { return it }
+         val webView = currentReflowablePageFragment?.webView ?: return false
+
+         when (settings.value.readingProgression) {
+@@ -889,6 +921,7 @@
+             return goToPreviousResource(jump = false, animated = animated)
+         }
+
++        turnPageWithSelection(forward = false, animated = animated)?.let { return it }
+         val webView = currentReflowablePageFragment?.webView ?: return false
+
+         when (settings.value.readingProgression) {
+@@ -911,7 +944,17 @@
              locatorToNextResource()?.let { listener?.onJumpToLocator(it) }
          }
 
@@ -140,7 +177,7 @@
 
          currentReflowablePageFragment?.webView?.let { webView ->
              if (settings.value.readingProgression == ReadingProgression.RTL) {
-@@ -933,7 +958,17 @@
+@@ -933,7 +976,17 @@
              locatorToPreviousResource()?.let { listener?.onJumpToLocator(it) }
          }
 

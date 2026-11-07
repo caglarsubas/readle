@@ -29,5 +29,6 @@ The following index covers spec section 16. `accepted` identifies a bounded impl
 | [023](023-epub-first.md) | EPUB-first reader, PDF source/reference | Accepted from build 11 UAT |
 | [024](024-epub-selection-gestures.md) | Native selection scrolling and edge-driven page turns | Accepted for Android; physical follow-up in 025 |
 | [025](025-reader-panels-and-page-navigation.md) | Reader panels, scroll navigation, and Find | Accepted for Android build 14 |
+| [026](026-live-selection-page-turns.md) | Adjustable native selections after ordinary page turns | Accepted for Android build 15 |
 
 The v1.3 model-switch contract is part of decisions 003, 005, 012 and 013. Saved-session state is part of decisions 002 and 006, with annotation isolation in 022. Android UAT uses a stable signing identity and app ID with incremental build numbers.

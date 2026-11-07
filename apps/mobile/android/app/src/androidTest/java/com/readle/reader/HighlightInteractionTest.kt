@@ -549,6 +549,92 @@ class HighlightInteractionTest {
     }
 
     @Test
+    fun nativeSelectionRemainsAdjustableAfterButtonPageTurns() =
+        checkAdjustableSelectionAfterPageTurns(buttons = true)
+
+    @Test
+    fun nativeSelectionRemainsAdjustableAfterSwipePageTurns() =
+        checkAdjustableSelectionAfterPageTurns(buttons = false)
+
+    private fun checkAdjustableSelectionAfterPageTurns(buttons: Boolean) {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            evaluateEpub("document.scrollingElement.scrollWidth > innerWidth * 1.5") == "true"
+        }
+        if (buttons) {
+            val fontBefore = epubFontSize()
+            repeat(4) { click("Text +") }
+            waitUntil { epubFontSize() > fontBefore * 1.5 }
+        } else {
+            click("Next")
+            waitUntil { webScrollXy().first > 100 }
+        }
+        longPressEpubWord()
+        fun range() = JSONObject(evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        val original = range()
+        val page = webScrollXy().first
+        val bounds = webScreenBounds()
+        fun turn(forward: Boolean) {
+            if (buttons) click(if (forward) "Next" else "Previous")
+            else {
+                val left = bounds.left + bounds.width() * .15f
+                val right = bounds.right - bounds.width() * .15f
+                swipe(
+                    if (forward) right else left,
+                    bounds.exactCenterY(),
+                    if (forward) left else right,
+                    bounds.exactCenterY(),
+                )
+            }
+        }
+        turn(forward = buttons)
+        waitUntil { if (buttons) webScrollXy().first > page + 100 else webScrollXy().first == 0 }
+        assertEquals(
+            "Live selection was cleared by page navigation",
+            JSONObject.quote("appearance"),
+            evaluateEpub("getSelection().toString().trim()"),
+        )
+        assertEquals(original.toString(), range().toString())
+        turn(forward = !buttons)
+        waitUntil { webScrollXy().first == page }
+        assertEquals(original.toString(), range().toString())
+        val name = if (buttons) "buttons" else "swipes"
+        visualCheckpoint("$name-range-returned")
+        awaitEpubFrame()
+
+        // This must move a real Chromium handle. A retained quote or a DOM-only
+        // range cannot satisfy the native drag and fixed-opposite-endpoint checks.
+        val handle = selectionHandle(start = !buttons)
+        dragTouch(
+            handle.first,
+            handle.second,
+            if (buttons) bounds.right - 4f else bounds.left + 4f,
+            handle.second,
+            1800,
+        )
+        waitUntil {
+            if (buttons) webScrollXy().first > page + bounds.width() * .8
+            else webScrollXy().first < page - bounds.width() * .8
+        }
+        val extended = range()
+        val fixed = if (buttons) "start" else "end"
+        assertEquals(original.getJSONArray(fixed).toString(), extended.getJSONArray(fixed).toString())
+        assertEquals(original.getInt("${fixed}Offset"), extended.getInt("${fixed}Offset"))
+        val quote = evaluateEpub("getSelection().toString()")
+        assertTrue(JSONArray("[$quote]").getString(0).length > 50)
+        val stoppedAt = webScrollXy().first
+        SystemClock.sleep(1400)
+        assertEquals(stoppedAt, webScrollXy().first)
+        assertEquals(quote, evaluateEpub("getSelection().toString()"))
+        visualCheckpoint("$name-range-adjusted")
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 2 }
+    }
+
+    @Test
     fun previousNextAndHorizontalSwipesKeepTheSelectedPassage() {
         launchEpubForGestures()
         click("Layout")
@@ -718,6 +804,24 @@ class HighlightInteractionTest {
 
     private fun selectionState(): JSONObject? =
         JSONObject(database.session(sessionId).getString("state")).optJSONObject("selection")
+
+    private fun awaitEpubFrame() {
+        val ready = CountDownLatch(1)
+        scenario!!.onActivity { activity ->
+            val web = findVisibleWebView(activity.window.decorView)!!
+            web.postVisualStateCallback(
+                SystemClock.uptimeMillis(),
+                object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        web.postOnAnimation { ready.countDown() }
+                    }
+                },
+            )
+        }
+        assertTrue("WebView did not render the returned selection", ready.await(3, TimeUnit.SECONDS))
+        instrumentation.waitForIdleSync()
+        instrumentation.uiAutomation.waitForIdle(500, 3000)
+    }
 
     private fun swipe(x: Float, y: Float, endX: Float, endY: Float) {
         val down = SystemClock.uptimeMillis()

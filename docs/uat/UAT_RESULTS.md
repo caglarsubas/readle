@@ -72,6 +72,16 @@ The owner explicitly authorized ADB and native touch instrumentation with visual
 
 VIS14-02 is withdrawn: system Back closes Notes on both screens with the unchanged build-14 APK. Earlier toolbar and synthetic gesture attempts did not demonstrate that action reliably. Two early native Notes attempts exposed input/harness problems; corrected tests pass without changing production code. VIS14-01 remains an app UX defect. These results complete the formerly blocked emulator checks; physical Z Fold7 / Android 17 acceptance and APK-upgrade evidence remain separate.
 
+## Build 15 — engineering qualification and owner handoff — 2026-11-07
+
+Continued VIS14-01 development with owner-authorized precise input and Android Studio visual observation. Build 15 preserves the live native range through ordinary turns, uses the native pager while selecting, retains unchanged source locators independently of reading progression, and protects saved JSON from Readium's consuming parser. See [ADR 026](../adr/026-live-selection-page-turns.md) and the [qualification evidence](BUILD_15_VISUAL_REVIEW.md).
+
+**Engineering checks passed:** 23/23 native tests on Pixel 7 API 36, three consecutive swipe-to-handle replays without multi-second visual pauses, two handle regressions on each foldable screen with visual checkpoints, complete-locator regression, nine storage/migration tests, four React Native tests, TypeScript, lint, native compilation and signature verification. The original build-14 APK fails both new handle regressions. An early 22/23 run exposed the need to await rendered native handles before coordinate input; the final test keeps all original range, real-handle and fixed-opposite-endpoint assertions.
+
+The Build 14 → candidate 15 → final 15 chain retained old work without clearing data. On the final APK, offline force-stop/reopen visibly restored two distinct phone sessions and the saved `appearance` / `rest` note in Pages. Cover → inner → cover retained the foldable's edited note, source highlights, Notes panel and layout. Host-emulator exits, startup System UI ANR and manual Mac unlock are documented as infrastructure history. The second host exit interrupted an additional phone note screenshot and final About revisit after the passing suite and live restoration; it does not erase those completed observations.
+
+The signed APK, fixtures, upgrade guidance and B15-01..07 checklist are ready. The install helper defaults to build 15. **Physical Samsung Z Fold7 / Android 17 owner acceptance has not been reported.** Emulator results do not supply that acceptance or the native iOS gate.
+
 ## Open evidence and rollback
 
 Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Build-12 physical Z Fold7 fold/unfold was accepted in the owner report. Native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending. EPUB selection gesture acceptance remains open.

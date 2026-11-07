@@ -1,6 +1,6 @@
 # Readle implementation plan
 
-Prepared 2026-11-04, updated 2026-11-05. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. **Build 11 UAT overrides:** new sessions are blank, with session-owned annotations ([ADR 022](adr/022-session-annotations.md)); EPUB is the primary MVP reader/learning format and PDF is retained for source/reference ([ADR 023](adr/023-epub-first.md)). These decisions supersede conflicting text in the original blueprint and earlier build records. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
+Prepared 2026-11-04, updated 2026-11-07. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. **Build 11 UAT overrides:** new sessions are blank, with session-owned annotations ([ADR 022](adr/022-session-annotations.md)); EPUB is the primary MVP reader/learning format and PDF is retained for source/reference ([ADR 023](adr/023-epub-first.md)). These decisions supersede conflicting text in the original blueprint and earlier build records. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
 
 ## Phase A — Reader spike — P0 — in progress
 
@@ -25,7 +25,7 @@ B01b Apply build 11 UAT. Depends on B02 and schema 2 migration. Isolate annotati
 
 B01c Complete native EPUB selection gestures from build-12 UAT. Depends on B01b and the pinned navigator patch in ADR 024. Verify a real long-press selection survives finger scrolling in Continuous scroll, dragging an end handle turns forward, dragging a start handle turns backward, the opposite anchor remains fixed, page turning stops after release, and the saved range survives reopen. DOM-range-only tests are insufficient for this gate. Build 12's other UAT items are accepted by owner report. Build 13 forward extension passed on the Z Fold7, with the remaining reader defects tracked by B01d.
 
-B01d Address build-13 UAT. Depends on B01b/B01c. Show the installed Android version and build in About. Verify vertical scrolling and chapter transitions, horizontal page turns, both native handle directions and retaining the selected passage during page turns. Keep note and selection actions inside the reading view. Find EPUB text on device and open the matched source. Verify offline on emulators and repeat on Z Fold7 cover and inner screens. See ADR 025 and B14-01..07.
+B01d Address build-13 UAT. Depends on B01b/B01c. Show the installed Android version and build in About. Verify vertical scrolling and chapter transitions, horizontal page turns, both native handle directions and retaining an adjustable selection during page turns. Keep note and selection actions inside the reading view. Find EPUB text on device and open the matched source. Verify offline on emulators and repeat on Z Fold7 cover and inner screens. See ADR 025/026 and B15-01..07.
 
 ### Current delivery status
 
@@ -34,16 +34,16 @@ B01d Address build-13 UAT. Depends on B01b/B01c. Show the installed Android vers
 | A01 | Android build, CI baseline, JS checks and SQLite tests verified | iOS reader build remains separate |
 | A02 | Build 10 Android UAT reported pass | Native iOS integration/physical verification, EPUB cross-screen selection on physical devices, full accessibility and measured performance |
 | A03 | Four-file import, duplicate, corrupt retry and missing-source recovery verified | B03 expanded corpus |
-| A04 | Signed standalone build 10 installed and accepted by owner | Build 12 supplied for feedback and physical upgrade verification |
+| A04 | Signed standalone APKs delivered; build 10 installed and accepted by owner | Build 15 physical upgrade and current reader acceptance |
 | B01 | Partial Android reader, dictionary lookup, notes and export | Shelves, manual bookmarks, EPUB search qualification and remaining B acceptance |
 | B01a | Build 11 locally verified; owner reported PDF/selection defects and changed session/format scope | Superseded by B01b |
 | B01b | Build 12 owner reports other items passed; native selection scrolling/page extension failed | Selection gestures carried by B01c |
 | B01c | Build 13 emulator tests passed; owner confirmed forward handle extension | Scroll, reverse extension and selection retention carried by B01d |
-| B01d | Build 14 precise-input Android Studio follow-up completes held-edge and foldable emulator checks; system Back passes | VIS14-01 adjustable selection continuity and full Z Fold7 / Android 17 acceptance; [visual evidence](uat/BUILD_14_VISUAL_FOLLOWUP.md). Earlier VIS14-02 withdrawn after delivered Back passes. |
+| B01d | Build 15 retains live handles and complete source locators; 23 native tests, three consecutive synchronized swipe replays, foldable visual regressions and nine storage/migration checks pass | Physical Z Fold7 / Android 17 B15-01..07. [Build 15 evidence](uat/BUILD_15_VISUAL_REVIEW.md). Build 14 history remains in its follow-up. |
 | B02 | Android local independent reading workspaces verified; build 10 UAT reported pass | Full learning/chat restoration as those features arrive, server ownership/revisions and later sync |
 | B03 | Initial fixtures verified | Revised edition, translation, OCR-poor file and eight-file batch evidence |
 
-The next bounded work is resolving VIS14-01 and obtaining physical B01d acceptance, alongside the iOS reader prerequisite. Held-edge and foldable emulator checks are completed in the visual follow-up. Repeat visible Android Studio testing before each handoff. Remaining offline-library behavior and the expanded import corpus follow the reader gate. C and later milestones retain their stated dependencies. See [the UAT results](uat/UAT_RESULTS.md) and [current build evidence](uat/READER_SPIKE_STATUS.md).
+The next bounded work is physical B01d acceptance on Build 15, alongside the iOS reader prerequisite. VIS14-01 passes engineering qualification, including native handle adjustment after ordinary turns and final-APK offline restoration. Host emulator interruptions and recovered runs are recorded separately in the evidence. Repeat visible Android Studio testing before each handoff. Remaining offline-library behavior and the expanded import corpus follow the reader gate. C and later milestones retain their stated dependencies. See [the UAT results](uat/UAT_RESULTS.md) and [current build evidence](uat/READER_SPIKE_STATUS.md).
 
 ## Phase C — Source-grounded assistant and switching — P0
 

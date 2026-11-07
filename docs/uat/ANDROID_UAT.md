@@ -1,21 +1,25 @@
-# Build 14 — Android reader UAT
+# Build 15 — Android reader UAT
 
-On your Samsung Z Fold7, open the private `output/android/readle-uat-14.apk` and choose **Update** over build 13. Leave the installed app and its data in place. The APK runs offline and needs no development server or AI key. It uses the same `com.readle.uat` application ID, signing certificate and SQLite schema 2.
+Engineering checks passed: 23 native tests, three consecutive swipe-to-handle replays, and Android Studio visual review on both foldable screens. Physical owner acceptance is pending; see [the results and evidence](BUILD_15_VISUAL_REVIEW.md).
 
-Open **About** in the Library header to confirm **Version 0.1.0-spike · Build 14**. Use **Add sample books** or the private `readle-uat-14-fixtures.zip`, then repeat the reader checks in the EPUB that exposed the original issues.
+Open the privately supplied `readle-uat-15.apk` on your Samsung Z Fold7 and choose **Update** over the existing Readle UAT app. Keep the app and its data installed. Build 15 uses the same `com.readle.uat` application ID, signing certificate and SQLite schema 2 as builds 13/14. It runs without a development server or AI key.
 
-The [2026-11-07 Android Studio follow-up](BUILD_14_VISUAL_FOLLOWUP.md) completes held-edge and foldable emulator checks with precise input and visual observation. System Back closes Notes on both screens; the earlier suspected Back defect is withdrawn. Ordinary page turns retain the quote but remove native adjustment handles (VIS14-01), so Build 14 has not passed the complete interaction gate. Repeat visible gesture checks before each handoff; physical Z Fold7 results remain separate.
+Open Library → **About** and confirm **Version 0.1.0-spike · Build 15**. Use an existing EPUB plus **Add sample books** or `readle-uat-15-fixtures.zip`. The sample's repeated paragraphs are intentional.
+
+This build addresses VIS14-01: ordinary page turns retain the live native selection, so its handles can be dragged after returning to the source page. The exact selected source locator stays separate from the current reading page. See [ADR 026](../adr/026-live-selection-page-turns.md) and [Build 15 evidence](BUILD_15_VISUAL_REVIEW.md). Owner results on the physical Z Fold7 / Android 17 remain separate from emulator checks.
 
 | ID | Action | Expected |
 |---|---|---|
-| B14-01 | Update over 13, open About and resume an old session. | About shows build 14; existing books, locations, notes and highlights remain. |
-| B14-02 | Select Layout → Continuous scroll in a long EPUB chapter. Swipe vertically with and without a selected word. At the bottom, swipe up again. Then switch to Pages and swipe horizontally. | Continuous scroll moves the text up/down and continues to the next chapter at its edge; Pages moves a full page sideways. The selected word remains available. |
-| B14-03 | In Pages, long-press a word. Drag the end handle to the right text edge and hold. On a later page, drag the start handle to the left edge and hold. | Each edge turns in its direction while extending the range. The opposite boundary stays fixed. Releasing stops the turn. |
-| B14-04 | Select a word and tap Next, then Previous. Repeat with a horizontal swipe. Open Selection and save or reopen the passage. | The same words remain available as the working selection even when you move away. Opening the passage returns to its source. |
-| B14-05 | Open Selection → Add note, type and save. Tap the highlight, edit the note, and open Notes. Press Android Back from the panel. | The controls open inside the reader, preserve the reading context and close back to the page. The note is saved in this session. |
-| B14-06 | Enable airplane mode. In the sample EPUB, Find `hypothetical linear response` and open the hit. Try a query with no matches. | A preview opens the matched passage in chapter 2 and marks it. A missing phrase shows “No matches found.” |
-| B14-07 | Repeat B14-02..06 on the cover and inner screens. Fold/unfold, force-stop and reopen a session with a saved note. | The reader remains usable; the saved source passage and chosen layout survive. |
+| B15-01 | Update the installed app, open About, and resume an old session. | About shows build 15. Existing books, distinct sessions, notes, highlights and layout choices remain. |
+| B15-02 | In Pages, long-press a word. Tap Next, then Previous. Drag the returned selection's end handle to the right text edge and hold; release it. | The same word remains selected with usable native handles. The range extends onto the next page, its starting boundary stays fixed, and turning stops after release. No second long press is needed. |
+| B15-03 | On a later page, select a word. Swipe to the previous page and then back. Drag the selection's start handle to the left text edge and hold; release it. | The same range and handles return. Extension moves backward, its ending boundary stays fixed, and turning stops after release. |
+| B15-04 | In Continuous scroll, select a word and swipe vertically. At a chapter edge, swipe again to cross it. Switch to Pages and swipe horizontally. | Scroll moves text vertically while retaining the selected word. Chapter-edge navigation works in both directions. Pages moves horizontally. |
+| B15-05 | Open Selection → Add note, save, edit the saved note, and use Open source. Open Notes and press Android Back. Then explicitly Clear selection and select another word. | Actions stay inside the reader; edits remain on the original source range. Back closes Notes. Clear selection allows a fresh range without bringing back the old one. |
+| B15-06 | In airplane mode, Find `hypothetical linear response` in the sample EPUB and open the hit. Try an absent phrase. | The hit opens chapter 2 and marks the exact phrase. An absent phrase shows “No matches found.” |
+| B15-07 | Repeat B15-02..06 on cover and inner screens. Save a long highlight, force-stop, reopen through Library, and fold/unfold. Open another session for the same book. | Saved source passages, notes and layout survive. Each session keeps its own workspace; a new session starts blank. |
 
-Fixed-layout EPUBs stay in Pages. In reflowable EPUB, chapter edges are separate transitions; a native range can extend across pages of the same chapter. See [recorded owner feedback](UAT_RESULTS.md) and [build evidence](READER_SPIKE_STATUS.md).
+Native selection extension is supported across pages of one chapter/resource. Cross-chapter native ranges remain open; chapter transitions preserve the saved quote. Fixed-layout EPUB stays in Pages. PDF remains source/reference under the accepted EPUB-first scope.
 
-Report device, Android version, fold state and one Pass / Fail / Blocked result per item. For a failure, include the book, page/chapter, expected behavior and what you saw.
+Report Pass / Fail / Blocked per item, fold state, book and expected versus observed behavior. Physical-device, iOS, accessibility and named-hardware timing gates remain independent.
+
+Previous checklist: [Build 14](BUILD_14_CHECKLIST.md). Earlier observations: [Build 14 follow-up](BUILD_14_VISUAL_FOLLOWUP.md).
