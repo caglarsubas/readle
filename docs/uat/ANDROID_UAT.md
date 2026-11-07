@@ -4,7 +4,7 @@ On your Samsung Z Fold7, open the private `output/android/readle-uat-14.apk` and
 
 Open **About** in the Library header to confirm **Version 0.1.0-spike · Build 14**. Use **Add sample books** or the private `readle-uat-14-fixtures.zip`, then repeat the reader checks in the EPUB that exposed the original issues.
 
-The [2026-11-07 Android Studio visual review](BUILD_14_VISUAL_REVIEW.md) found remaining selection-continuity and Android Back issues. Build 14 has not passed the complete interaction gate. Before the next handoff, repeat these gestures visibly in Android Studio and record observed results in addition to automated checks; physical Z Fold7 results remain separate.
+The [2026-11-07 Android Studio follow-up](BUILD_14_VISUAL_FOLLOWUP.md) completes held-edge and foldable emulator checks with precise input and visual observation. System Back closes Notes on both screens; the earlier suspected Back defect is withdrawn. Ordinary page turns retain the quote but remove native adjustment handles (VIS14-01), so Build 14 has not passed the complete interaction gate. Repeat visible gesture checks before each handoff; physical Z Fold7 results remain separate.
 
 | ID | Action | Expected |
 |---|---|---|

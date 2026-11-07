@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-07",
+  "application": {
+    "applicationId": "com.readle.uat",
+    "versionName": "0.1.0-spike",
+    "versionCode": 14,
+    "sourceCommit": "846574e56cb1e5fd8e327ca34dc22190721e1b95",
+    "installedAndDeliveredApkSha256": "73060fe176c8a6fb882d0e40cad99d1e241d2576bc625e3d8b4fb54a1b5d99f2",
+    "productionApkChanged": false
+  },
+  "testSourceSha256": "b4844141d8efb1d5f553537eb8da96804b7228f5e6c220e2f5bfbe13cedf9cbc",
+  "device": {
+    "avd": "Readle_Fold_UAT_API36",
+    "serial": "emulator-5554",
+    "model": "Pixel Fold AVD",
+    "android": "16",
+    "api": 36,
+    "inner": [
+      2208,
+      1840
+    ],
+    "cover": [
+      1080,
+      2092
+    ],
+    "airplaneMode": true,
+    "wifiEnabled": false,
+    "defaultNetwork": null
+  },
+  "method": "Owner-authorized ADB and native MotionEvent instrumentation with live visual verification in Android Studio Running Devices; opt-in observation checkpoints.",
+  "finalRuns": {
+    "cover-held-edges.txt": {
+      "passed": 2
+    },
+    "cover-reader-final.txt": {
+      "passed": 5
+    },
+    "inner-selection-final.txt": {
+      "passed": 4
+    },
+    "inner-reader-checks.txt": {
+      "passed": 3
+    }
+  },
+  "earlierAttempts": {
+    "cover-reader-checks.txt": "2 passed, 1 failed: synthetic Back input did not close Notes; superseded by delivered system Back.",
+    "cover-panels-find.txt": "1 passed, 1 failed: harness tried Open source without reopening saved highlight actions; corrected in final run."
+  },
+  "restoration": [
+    {
+      "sessionId": "baa0c9e9-6004-4497-9b05-93dbc6d312cb",
+      "flow": "Cover force-stop/reopen via Library, unfold to inner, inner force-stop/reopen via Library.",
+      "quote": "appearance",
+      "note": "Fold visual UAT edited",
+      "layout": "Pages"
+    },
+    {
+      "sessionId": "8be2a7c4-5553-4140-8224-38fd46be54b8",
+      "flow": "Inner force-stop/reopen via Library, fold back to cover.",
+      "quote": "appearance",
+      "note": "Fold visual UAT edited",
+      "layout": "Pages"
+    }
+  ],
+  "findings": {
+    "VIS14-01": "Open: ordinary turns retain the quote but remove adjustable native handles.",
+    "VIS14-02": "Withdrawn: delivered system Back closes Notes on both screens with unchanged APK."
+  },
+  "notClaimed": [
+    "Physical Samsung Z Fold7 Android 17 acceptance",
+    "New APK-upgrade verification",
+    "Native cross-chapter range extension",
+    "iOS acceptance",
+    "Named-hardware accessibility or performance acceptance"
+  ],
+  "artifacts": {
+    "cover-end-before.png": "30d72afdc579abd7777e37132a65997036ed96feabceda20937ef83cc7da8c19",
+    "cover-end-stopped.png": "4526caaa66b3e7976f0d75b4ed4db0a254cca617f955124badad81d7b31bb7ec",
+    "cover-find-chapter-two.png": "4b40b2f8bb4ad6c47645a053a830d1723e7a594f9dbb04f9136caa17956db557",
+    "cover-held-edges.txt": "4c3552ce5c7d86091870b4808f4bf98f7ff6c0e26147bf312da051d75631ace2",
+    "cover-notes-back-closed.png": "41315a936d24e085b8bcc7bdcab2f96862f0b95a3cc96fba67bc486913ec6e51",
+    "cover-notes-final.txt": "19cd8fc2958184c2fb7daeaab9e819350ac92be9adfcb196fc76781fb1559644",
+    "cover-panels-find.txt": "97fa16d72a2ff7d236d26cbeb7d3c7832a185f8023147100f0898b8d8a29ddf5",
+    "cover-reader-checks.txt": "f4795acb3cb69d75f9508aecc795b1d9d266ef59b6b0230b5b6f8493a060eb20",
+    "cover-reader-final.txt": "3a82742507427957d4e259ed08e429a6b539d654d68c534812480b60da33eb96",
+    "cover-refolded-notes.png": "288a245cd02e681d1ca2cf7ee46e0d55aad077ac0197d1954028aa591a61b522",
+    "cover-restarted-notes.png": "f8ca40584d3cf5d960596ef6ba56fd05efe8a2487120380ae5bf4e68e19e72b9",
+    "cover-selection-after-button-turns.png": "ec70c447e0c6ac5d6dfe602916da4fffcc34a47b9d2dfcf3722e664f4ff8b353",
+    "cover-start-before.png": "99240f60f2470be0282cc7a96c8aec26fd09c574b1156ac2f24a0b1a643900d6",
+    "cover-start-stopped.png": "28eeceec3dc5f8e8377f01ec345ab96d3eaf9910d5ec6aa87456443c5cb85ed4",
+    "inner-end-before.png": "94db27d258ea4b10bf6c70ac767b8d60be8ceeb8d8cbfb631a76b885d7386e51",
+    "inner-end-stopped.png": "12d5584c0ea0f318a958ebdbe500b7b6063cccc1e2c7f4bc71754c95ff664f83",
+    "inner-find-chapter-two.png": "6478c65faf8253c39edc60b197653bfc3532165599ade9b5147a1e0a466ddbd0",
+    "inner-held-edges.txt": "0e0d14b76876b0bcff649786257e824ac3547a6e6199eff970a1767d3f8bade8",
+    "inner-notes-back-closed.png": "82faa002db21077b03ec4ccca38e8aa5404392277803dc30433bbb9cb749023b",
+    "inner-reader-checks.txt": "d090fdd44244c9ee8048db0b79dd70ecb2725332b73183eff95c4d7674f7d7f2",
+    "inner-restarted-notes.png": "a19582e5449f369841040b8db81f73d7872c2733c7a9aa3541b80919a9171f14",
+    "inner-selection-after-button-turns.png": "798fb85099baa0ebc70bbedf0c68ad9d1bf3e98b47db8d5acc72faf36765e69a",
+    "inner-selection-final.txt": "14dcc5e299f6ed1be84e7bb3a4358549ce0fa938c9a45a2ad597a1868ab6e417",
+    "inner-start-before.png": "c8391ce7c3176997eda102f9e725f22c74da219e3ad4d683ad0265a177539b89",
+    "inner-start-stopped.png": "01bb3ddbac64e12c7fad5a8d11955b85209f011b69479f6d187d7903ec5fd67e"
+  }
+}

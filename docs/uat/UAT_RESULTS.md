@@ -62,9 +62,15 @@ Forward extension was reported working. The report does not establish a pass for
 
 At the owner's request, operated the installed build through the existing Android Studio application's visible Pixel 7 and Pixel Fold API 36 emulators. [Full observations and screenshots](BUILD_14_VISUAL_REVIEW.md) distinguish the exercised subchecks from blocked or untested ones.
 
-About, vertical scrolling with a selected word, in-reader note save/reopen, forward/backward horizontal page swipes, retained quotes and Find results were observed working. Active selection handles disappear after ordinary page turns (VIS14-01); retaining the quote alone does not complete the requested adjustable selection interaction. The device Back control left Notes open while its Close button worked (VIS14-02). Held-edge turns were not qualified with the available drag input. Folding reached an Android lock screen that the available gestures did not dismiss, leaving cover/restoration testing blocked. No physical Z Fold7 acceptance or complete B14 pass is recorded.
+The first attempt observed About, scrolling, retained quotes, note save/reopen and Find, but its available input could not qualify held-edge turns, cover restoration or Android Back. These initial limitations are superseded by the follow-up below. Active selection handles disappear after ordinary page turns (VIS14-01); retaining the quote alone does not complete the requested adjustable selection interaction.
 
 Future reader handoffs require a recorded visual Android Studio gesture review alongside automated checks. Build 14's full interaction acceptance remains open.
+
+## Build 14 — precise-input visual follow-up — 2026-11-07
+
+The owner explicitly authorized ADB and native touch instrumentation with visual observation in Android Studio. On the Pixel Fold API 36 emulator, both cover and inner screens pass native held-edge extension forward and backward, fixed opposite endpoints, and stopping after release. Both screens also exercise continuous scrolling, chapter-edge transitions, retained quotes, note save/edit/Open source, delivered system Back and offline Find. The saved note and Pages preference survive the fold/unfold transition and actual force-stop/reopen through Library. See the [follow-up report and evidence](BUILD_14_VISUAL_FOLLOWUP.md).
+
+VIS14-02 is withdrawn: system Back closes Notes on both screens with the unchanged build-14 APK. Earlier toolbar and synthetic gesture attempts did not demonstrate that action reliably. Two early native Notes attempts exposed input/harness problems; corrected tests pass without changing production code. VIS14-01 remains an app UX defect. These results complete the formerly blocked emulator checks; physical Z Fold7 / Android 17 acceptance and APK-upgrade evidence remain separate.
 
 ## Open evidence and rollback
 

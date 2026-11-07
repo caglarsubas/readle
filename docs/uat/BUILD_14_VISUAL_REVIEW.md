@@ -1,6 +1,6 @@
 # Build 14 — Android Studio visual review
 
-Performed 2026-11-07 at the owner's request to inspect the actual reader UI and gestures. **The complete interaction gate is not passed.** Quote retention works, but editable selection continuity still has a UX gap; Android Back also did not close the Notes panel in this run.
+Performed 2026-11-07 at the owner's request to inspect the actual reader UI and gestures. **Historical first attempt:** the [completed follow-up](BUILD_14_VISUAL_FOLLOWUP.md) supersedes its held-edge, foldable and Back findings. Precise input with Android Studio observation passes held-edge turns and foldable restoration; delivered system Back closes Notes, so VIS14-02 is withdrawn. VIS14-01 (adjustable selection continuity after ordinary turns) remains open. The observations below preserve the original attempt and its input limitations.
 
 ## Method and environment
 

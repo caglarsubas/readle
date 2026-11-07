@@ -39,11 +39,11 @@ B01d Address build-13 UAT. Depends on B01b/B01c. Show the installed Android vers
 | B01a | Build 11 locally verified; owner reported PDF/selection defects and changed session/format scope | Superseded by B01b |
 | B01b | Build 12 owner reports other items passed; native selection scrolling/page extension failed | Selection gestures carried by B01c |
 | B01c | Build 13 emulator tests passed; owner confirmed forward handle extension | Scroll, reverse extension and selection retention carried by B01d |
-| B01d | Build 14 changes; Android Studio visual review found remaining interaction gaps | VIS14-01 adjustable selection continuity, VIS14-02 panel Back dismissal, held-edge checks and full Z Fold7 / Android 17 acceptance; [visual evidence](uat/BUILD_14_VISUAL_REVIEW.md) |
+| B01d | Build 14 precise-input Android Studio follow-up completes held-edge and foldable emulator checks; system Back passes | VIS14-01 adjustable selection continuity and full Z Fold7 / Android 17 acceptance; [visual evidence](uat/BUILD_14_VISUAL_FOLLOWUP.md). Earlier VIS14-02 withdrawn after delivered Back passes. |
 | B02 | Android local independent reading workspaces verified; build 10 UAT reported pass | Full learning/chat restoration as those features arrive, server ownership/revisions and later sync |
 | B03 | Initial fixtures verified | Revised edition, translation, OCR-poor file and eight-file batch evidence |
 
-The next bounded work is resolving the visually observed B01d interaction gaps and completing its open gesture checks, alongside the iOS reader prerequisite. Repeat visible Android Studio testing before each handoff. Remaining offline-library behavior and the expanded import corpus follow the reader gate. C and later milestones retain their stated dependencies. See [the UAT results](uat/UAT_RESULTS.md) and [current build evidence](uat/READER_SPIKE_STATUS.md).
+The next bounded work is resolving VIS14-01 and obtaining physical B01d acceptance, alongside the iOS reader prerequisite. Held-edge and foldable emulator checks are completed in the visual follow-up. Repeat visible Android Studio testing before each handoff. Remaining offline-library behavior and the expanded import corpus follow the reader gate. C and later milestones retain their stated dependencies. See [the UAT results](uat/UAT_RESULTS.md) and [current build evidence](uat/READER_SPIKE_STATUS.md).
 
 ## Phase C — Source-grounded assistant and switching — P0
 

@@ -37,6 +37,7 @@ class HighlightInteractionTest {
     private lateinit var sourceFile: File
     private lateinit var importId: String
     private var scenario: ActivityScenario<ReaderActivity>? = null
+    private var keepVisualWorkspace = false
 
     @Before
     fun setup() {
@@ -105,6 +106,7 @@ class HighlightInteractionTest {
 
     @After
     fun cleanup() {
+        if (keepVisualWorkspace) return
         scenario?.close()
         if (::bookId.isInitialized) {
             val stored = File(database.book(bookId).getString("path"))
@@ -378,6 +380,7 @@ class HighlightInteractionTest {
         )
         waitUntil { webScrollXy().second > before + 100 }
         assertEquals(selected, evaluateEpub("getSelection().toString()"))
+        visualCheckpoint("selected-finger-scroll")
         click("Selection")
         click("Highlight")
         waitUntil { database.annotations(sessionId).length() == 2 }
@@ -421,6 +424,7 @@ class HighlightInteractionTest {
         val bounds = webScreenBounds()
         val handle = selectionHandle(false)
         captureGesture("end-before")
+        visualCheckpoint("end-before")
         dragTouch(handle.first, handle.second, bounds.right - 4f, handle.second, 1800)
         captureGesture("end-after")
         waitUntil { webScrollXy().first > before + bounds.width() * .8 }
@@ -430,6 +434,7 @@ class HighlightInteractionTest {
         SystemClock.sleep(1400)
         assertEquals("Page kept turning after finger release", stoppedAt, webScrollXy().first)
         assertEquals(stoppedQuote, evaluateEpub("getSelection().toString()"))
+        visualCheckpoint("end-stopped")
         click("Selection")
         click("Highlight")
         waitUntil { database.annotations(sessionId).length() == 2 }
@@ -479,12 +484,19 @@ class HighlightInteractionTest {
         val bounds = webScreenBounds()
         val handle = selectionHandle(true)
         captureGesture("start-before")
+        visualCheckpoint("start-before")
         dragTouch(handle.first, handle.second, bounds.left + 4f, handle.second, 1800)
         captureGesture("start-after")
         waitUntil { webScrollXy().first < before - bounds.width() * .8 }
         val quote = JSONArray("[" + evaluateEpub("getSelection().toString()") + "]").getString(0)
         assertTrue(quote.length > 50)
         assertTrue(quote.endsWith("appearance"))
+        val stoppedAt = webScrollXy().first
+        val stoppedQuote = evaluateEpub("getSelection().toString()")
+        SystemClock.sleep(1400)
+        assertEquals("Previous page kept turning after release", stoppedAt, webScrollXy().first)
+        assertEquals(stoppedQuote, evaluateEpub("getSelection().toString()"))
+        visualCheckpoint("start-stopped")
     }
 
     @Test
@@ -514,6 +526,7 @@ class HighlightInteractionTest {
         swipe(x, y - bounds.height() * .25f, x, y + bounds.height() * .25f)
         waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
         waitUntil { webScrollXy().second > 100 }
+        visualCheckpoint("scroll-chapter-return")
 
         click("Layout")
         click("Pages")
@@ -526,6 +539,7 @@ class HighlightInteractionTest {
         swipe(bounds.right - bounds.width() * .15f, y, bounds.left + bounds.width() * .15f, y)
         waitUntil { webScrollXy().first > 100 }
         assertEquals(0, webScrollXy().second)
+        visualCheckpoint("horizontal-pages")
         click("Layout")
         click("Continuous scroll")
         waitUntil {
@@ -550,6 +564,7 @@ class HighlightInteractionTest {
         click("Previous")
         waitUntil { webScrollXy().first == 0 }
         assertEquals(held, selectionState()!!.getJSONObject("locator").toString())
+        visualCheckpoint("selection-after-button-turns")
         click("Selection")
         click("Add note")
         scenario!!.onActivity { reader ->
@@ -586,6 +601,7 @@ class HighlightInteractionTest {
         click("Selection")
         click("Open passage")
         waitUntil { webScrollXy().first == 0 }
+        visualCheckpoint("selection-after-swipe-return")
     }
 
     @Test
@@ -607,6 +623,7 @@ class HighlightInteractionTest {
         }
         setQuery("zzzxq-not-a-word")
         waitForNode { it.text?.toString() == "No matches found." }
+        visualCheckpoint("find-no-matches")
         setQuery("hypothetical linear response")
         val result = waitForNode {
             it.className?.toString() == "android.widget.Button" &&
@@ -627,6 +644,76 @@ class HighlightInteractionTest {
                 .toDouble()
         assertTrue(quoteY >= 0)
         assertTrue(quoteY < evaluateEpub("innerHeight").toDouble())
+        visualCheckpoint("find-chapter-two")
+    }
+
+    @Test
+    fun readerNotesEditAndBackRestoreSamePassage() {
+        launchEpubForGestures()
+        longPressEpubWord()
+        click("Selection")
+        click("Add note")
+        fun setNote(text: String) {
+            val editor = waitForNode { it.className?.toString() == "android.widget.EditText" }
+            assertTrue(
+                editor.performAction(
+                    AccessibilityNodeInfo.ACTION_SET_TEXT,
+                    Bundle().apply {
+                        putCharSequence(
+                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                            text,
+                        )
+                    },
+                )
+            )
+        }
+        setNote("Fold visual UAT note")
+        click("Save")
+        waitUntil { database.annotations(sessionId).length() == 2 }
+        click("Notes")
+        waitForNode { it.text?.toString() == "appearance\nFold visual UAT note" }
+        visualCheckpoint("notes-saved")
+        // Deliver the system Back action, independent of emulator toolbar key forwarding.
+        assertTrue(
+            instrumentation.uiAutomation.performGlobalAction(
+                android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK,
+            )
+        )
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(500)
+        val backClosed = findNode(instrumentation.uiAutomation.rootInActiveWindow) {
+            it.text?.toString() == "This session’s highlights & notes" && it.isVisibleToUser
+        } == null
+        visualCheckpoint(if (backClosed) "notes-back-closed" else "notes-back-still-open")
+        // Retain evidence for editing/restoration even if this independent Back subcheck fails.
+        if (!backClosed) click("Close")
+        click("Notes")
+        click("appearance\nFold visual UAT note")
+        click("Edit note")
+        setNote("Fold visual UAT edited")
+        click("Save")
+        click("Notes")
+        click("appearance\nFold visual UAT edited")
+        click("Open source")
+        val saved = (0 until database.annotations(sessionId).length())
+            .map { database.annotations(sessionId).getJSONObject(it) }
+            .single { it.getString("note") == "Fold visual UAT edited" }
+        assertEquals("appearance", saved.getString("quote"))
+        click("Layout")
+        click("Pages")
+        waitUntil {
+            !JSONObject(database.session(sessionId).getString("state"))
+                .getJSONObject("preferences").getBoolean("epubScroll")
+        }
+        visualCheckpoint("note-edited-pages")
+        if (InstrumentationRegistry.getArguments().getString("readleKeepVisualFixture") == "true") {
+            File(context.getExternalFilesDir(null), "visual-workspace.json").writeText(
+                JSONObject().put("bookId", bookId).put("sessionId", sessionId)
+                    .put("annotation", saved).put("session", database.session(sessionId)).toString(2)
+            )
+            keepVisualWorkspace = true
+        }
+        assertTrue("System Back did not dismiss the Notes panel", backClosed)
     }
 
     private fun selectionState(): JSONObject? =
@@ -656,6 +743,22 @@ class HighlightInteractionTest {
                     "JSON.stringify({selection:getSelection().toString(),x:scrollX,y:scrollY})"
                 ),
         )
+    }
+
+    /** Opt-in observation time for a visible Android Studio run; normal checks do not pause. */
+    private fun visualCheckpoint(name: String) {
+        val pause =
+            InstrumentationRegistry.getArguments()
+                .getString("readleVisualPauseMs")
+                ?.toLongOrNull()
+                ?.coerceIn(0L, 30000L) ?: 0L
+        if (pause == 0L) return
+        captureGesture(name)
+        instrumentation.sendStatus(
+            0,
+            Bundle().apply { putString("stream", "Readle visual checkpoint: $name\n") },
+        )
+        SystemClock.sleep(pause)
     }
 
     private fun launchEpubForGestures() {

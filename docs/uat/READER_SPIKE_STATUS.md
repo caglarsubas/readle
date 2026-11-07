@@ -1,6 +1,6 @@
 # Build 14 reader handoff
 
-Updated 2026-11-06. The Z Fold7 owner reported that build 13 extends selections forward but not backward, its two layouts feel alike, ordinary turns lose selections, annotation dialogs feel separate, Find is unavailable in EPUB, and the installed version is not visible. See [the owner record](UAT_RESULTS.md).
+Updated 2026-11-07. The Z Fold7 owner reported that build 13 extends selections forward but not backward, its two layouts feel alike, ordinary turns lose selections, annotation dialogs feel separate, Find is unavailable in EPUB, and the installed version is not visible. See [the owner record](UAT_RESULTS.md).
 
 - Standalone APK: `output/android/readle-uat-14.apk` (private). Application ID `com.readle.uat`, version `0.1.0-spike`, version code 14, min API 24, target 36.
 - APK SHA-256: `73060fe176c8a6fb882d0e40cad99d1e241d2576bc625e3d8b4fb54a1b5d99f2`.
@@ -15,7 +15,7 @@ Find uses the local Readium search iterator and shows excerpts. Tapping a result
 
 ## Verification scope
 
-The [2026-11-07 Android Studio visual review](BUILD_14_VISUAL_REVIEW.md) observed scrolling, quote retention, note save/reopen and Find, but left the full interaction gate open. Adjustable selection handles disappear after normal page turns, and the device Back control did not dismiss Notes. Held-edge and complete foldable checks remain unqualified. These observations qualify the implementation descriptions above; automated passes do not establish visual acceptance.
+The [2026-11-07 Android Studio follow-up](BUILD_14_VISUAL_FOLLOWUP.md), using owner-authorized precise input, completes both held-edge directions and foldable emulator restoration. Cover and inner screen checks exercise offline scrolling, chapter transitions, quote retention, note editing, system Back and Find. The saved note and Pages preference survive folding/unfolding and force-stop/reopen through Library. Delivered system Back closes Notes, withdrawing the earlier VIS14-02 suspicion. Adjustable selection handles still disappear after normal page turns (VIS14-01), so the full interaction gate remains open. The [initial visual attempt](BUILD_14_VISUAL_REVIEW.md) is retained as historical evidence of input limitations.
 
 The app test exercises About using package metadata. Native touch tests distinguish the two layouts, navigate vertical chapter edges, drag both native handles, stop after release, retain a new selection through button/swipe turns, and save/reopen the rendered passage. Tests also exercise the in-reader note editor and search for a passage in a different EPUB chapter, including a no-results query. The private receipt retains exact APK, emulator and CI evidence.
 
