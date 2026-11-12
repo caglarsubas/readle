@@ -106,3 +106,21 @@ test('About shows the installed package version and can return to the library', 
   await press('Close About');
   expect(app.root.findAllByType(Text).some(node => node.props.children === book.title)).toBe(true);
 });
+
+test('sample import reports each outcome and opens an existing sample without creating a session', async () => {
+  const epub = { ...book, id: 'sample-epub', title: 'readle-sample', format: 'epub' };
+  bridge.books.mockResolvedValue([book, epub]);
+  bridge.importFixtures.mockResolvedValue([
+    { id: 'sample-1', name: 'readle-sample.epub', status: 'duplicate', bookId: epub.id, error: '' },
+    { id: 'sample-2', name: 'readle-sample.pdf', status: 'failed', bookId: '', error: 'Could not read the file' },
+  ]);
+
+  await press('Add sample books');
+  const labels = app.root.findAllByType(Text).map(node => node.props.children);
+  expect(labels).toContain('Sample EPUB: already in your library');
+  expect(labels).toContain('Sample PDF: Could not read the file');
+  expect(labels).not.toContain('View sample PDF');
+  await press('View sample EPUB');
+  expect(bridge.sessions).toHaveBeenCalledWith(epub.id);
+  expect(bridge.createSession).not.toHaveBeenCalled();
+});

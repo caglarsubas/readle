@@ -9,6 +9,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.webkit.WebView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -409,6 +411,60 @@ class HighlightInteractionTest {
     }
 
     @Test
+    fun nativeStartHandleAutoScrollsUpInContinuousLayout() {
+        launchEpubForGestures()
+        waitUntil {
+            evaluateEpub("scrollTo(0, document.scrollingElement.scrollHeight)")
+            !webCanScrollVertically(1)
+        }
+        longPressEpubWord("location")
+        checkUpwardContinuousHandle("scroll-start-handle-stopped")
+    }
+
+    @Test
+    fun returnedContinuousSelectionCanExtendUpWithoutAnotherLongPress() {
+        launchEpubForGestures()
+        waitUntil {
+            evaluateEpub("scrollTo(0, document.scrollingElement.scrollHeight)")
+            !webCanScrollVertically(1)
+        }
+        longPressEpubWord("location")
+        val original = evaluateEpub("window.__readleAnchors.capture().readleRange")
+        val bounds = webScreenBounds()
+        val x = bounds.left + bounds.width() * .82f
+        val upper = bounds.top + bounds.height() * .24f
+        val lower = bounds.top + bounds.height() * .75f
+        swipe(x, lower, x, upper)
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil { !webCanScrollVertically(-1) }
+        swipe(x, upper, x, lower)
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        waitUntil { !webCanScrollVertically(1) }
+        waitUntil { evaluateEpub("window.__readleAnchors.capture()?.readleRange") == original }
+        visualCheckpoint("scroll-selection-returned")
+        checkUpwardContinuousHandle("scroll-restored-handle-stopped")
+    }
+
+    private fun checkUpwardContinuousHandle(checkpoint: String) {
+        awaitEpubFrame()
+        val before = webScrollXy().second
+        val end = JSONObject(evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        val bounds = webScreenBounds()
+        val handle = selectionHandle(start = true)
+        dragTouch(handle.first, handle.second, handle.first, bounds.top + 4f, 1800)
+        waitUntil { webScrollXy().second < before - 100 }
+        val range = JSONObject(evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        assertEquals(end.getJSONArray("end").toString(), range.getJSONArray("end").toString())
+        assertEquals(end.getInt("endOffset"), range.getInt("endOffset"))
+        val stoppedAt = webScrollXy().second
+        val quote = evaluateEpub("getSelection().toString()")
+        SystemClock.sleep(1200)
+        assertEquals(stoppedAt, webScrollXy().second)
+        assertEquals(quote, evaluateEpub("getSelection().toString()"))
+        visualCheckpoint(checkpoint)
+    }
+
+    @Test
     fun nativeEndHandleTurnsNextPageAndSavesItsExtendedRange() {
         launchEpubForGestures()
         click("Layout")
@@ -549,6 +605,83 @@ class HighlightInteractionTest {
     }
 
     @Test
+    fun continuousChapterSwipesPreserveSelectedSourceInBothDirections() {
+        launchEpubForGestures()
+        waitUntil {
+            evaluateEpub("scrollTo(0, document.scrollingElement.scrollHeight)")
+            !webCanScrollVertically(1)
+        }
+        longPressEpubWord("location")
+        val original = evaluateEpub("window.__readleAnchors.capture().readleRange")
+        val b = webScreenBounds()
+        val x = b.left + b.width() * .82f
+        val upper = b.top + b.height() * .24f
+        val lower = b.top + b.height() * .75f
+        swipe(x, lower, x, upper)
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        waitUntil { !webCanScrollVertically(-1) }
+        assertEquals("location", selectionState()!!.getString("quote"))
+        assertEquals(original, selectionState()!!.getJSONObject("locator")
+            .getJSONObject("locations").getJSONObject("readleRange").toString())
+        visualCheckpoint("selected-scroll-next-chapter")
+        longPressEpubWord("weighted")
+        swipe(x, upper, x, lower)
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        waitUntil { !webCanScrollVertically(1) }
+        assertEquals("weighted", selectionState()!!.getString("quote"))
+        waitUntil {
+            evaluateEpub("readium.getDecorations('readle').items.every(i => !i.decoration.id.startsWith('selection'))") == "true"
+        }
+        visualCheckpoint("selected-scroll-previous-chapter")
+    }
+
+    private fun webCanScrollVertically(direction: Int): Boolean {
+        var canScroll = false
+        scenario!!.onActivity { activity ->
+            canScroll = findVisibleWebView(activity.window.decorView)!!.canScrollVertically(direction)
+        }
+        return canScroll
+    }
+
+    @Test
+    fun paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter() {
+        launchEpubForGestures()
+        click("Layout")
+        click("Pages")
+        click("Contents")
+        click("2. A simple learning rule")
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        click("Previous")
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        awaitEpubFrame()
+        longPressEpubWord("location")
+        val original = JSONObject(evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        click("Next")
+        waitUntil { evaluateEpub("location.pathname").contains("c1.xhtml") }
+        click("Previous")
+        waitUntil { evaluateEpub("location.pathname").contains("c0.xhtml") }
+        waitUntil { evaluateEpub("getSelection().toString()") == JSONObject.quote("location") }
+        assertEquals(original.toString(), evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        visualCheckpoint("chapter-selection-returned")
+        awaitEpubFrame()
+        val handle = selectionHandle(start = true)
+        val b = webScreenBounds()
+        dragTouch(handle.first, handle.second, b.left + 5f, handle.second, 1800)
+        val adjusted = JSONObject(evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        assertNotEquals(original.toString(), adjusted.toString())
+        assertEquals(original.getJSONArray("end").toString(), adjusted.getJSONArray("end").toString())
+        assertEquals(original.getInt("endOffset"), adjusted.getInt("endOffset"))
+        val stoppedAt = webScrollXy()
+        SystemClock.sleep(1200)
+        assertEquals(stoppedAt, webScrollXy())
+        assertEquals(adjusted.toString(), evaluateEpub("window.__readleAnchors.capture().readleRange"))
+        visualCheckpoint("chapter-selection-adjusted")
+        click("Selection")
+        click("Highlight")
+        waitUntil { database.annotations(sessionId).length() == 2 }
+    }
+
+    @Test
     fun nativeSelectionRemainsAdjustableAfterButtonPageTurns() =
         checkAdjustableSelectionAfterPageTurns(buttons = true)
 
@@ -556,7 +689,14 @@ class HighlightInteractionTest {
     fun nativeSelectionRemainsAdjustableAfterSwipePageTurns() =
         checkAdjustableSelectionAfterPageTurns(buttons = false)
 
-    private fun checkAdjustableSelectionAfterPageTurns(buttons: Boolean) {
+    @Test
+    fun paginatedSelectionRecoversIfWebViewDropsTheRangeWhileAway() =
+        checkAdjustableSelectionAfterPageTurns(buttons = true, loseNativeSelection = true)
+
+    private fun checkAdjustableSelectionAfterPageTurns(
+        buttons: Boolean,
+        loseNativeSelection: Boolean = false,
+    ) {
         launchEpubForGestures()
         click("Layout")
         click("Pages")
@@ -597,15 +737,21 @@ class HighlightInteractionTest {
             evaluateEpub("getSelection().toString().trim()"),
         )
         assertEquals(original.toString(), range().toString())
+        if (loseNativeSelection) {
+            // Reproduce a WebView losing its range while the source column is offscreen.
+            evaluateEpub("getSelection().removeAllRanges()")
+            waitUntil { evaluateEpub("getSelection().isCollapsed") == "true" }
+        }
         turn(forward = !buttons)
         waitUntil { webScrollXy().first == page }
+        waitUntil { evaluateEpub("window.__readleAnchors.capture()?.readleRange") == original.toString() }
         assertEquals(original.toString(), range().toString())
-        val name = if (buttons) "buttons" else "swipes"
+        val name = if (loseNativeSelection) "recovered" else if (buttons) "buttons" else "swipes"
         visualCheckpoint("$name-range-returned")
         awaitEpubFrame()
 
-        // This must move a real Chromium handle. A retained quote or a DOM-only
-        // range cannot satisfy the native drag and fixed-opposite-endpoint checks.
+        // Drive the rendered grip with touch. A retained quote or a DOM-only range
+        // cannot satisfy the handle drag and fixed-opposite-endpoint checks.
         val handle = selectionHandle(start = !buttons)
         dragTouch(
             handle.first,
@@ -1069,6 +1215,17 @@ class HighlightInteractionTest {
 
     private fun tapHighlight() {
         waitForPdfPage()
+        // A note save can finish while the keyboard is still changing the reader's
+        // insets. Sample the real hit location after the PDF viewport has settled.
+        waitUntil {
+            var keyboardHidden = false
+            scenario!!.onActivity { activity ->
+                keyboardHidden = ViewCompat.getRootWindowInsets(activity.window.decorView)
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == false
+            }
+            keyboardHidden
+        }
+        instrumentation.uiAutomation.waitForIdle(300, 3000)
         instrumentation.waitForIdleSync()
         var point: Pair<Float, Float>? = null
         scenario!!.onActivity { activity ->

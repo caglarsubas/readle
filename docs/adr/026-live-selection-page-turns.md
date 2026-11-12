@@ -13,3 +13,5 @@ Selection actions may explicitly finish the live range when opening their panel.
 Regression evidence must include a native long press, ordinary navigation away and back, and a real handle drag afterward. Compare the exact DOM paths and offsets before/after ordinary navigation and the opposite endpoint after extension. A DOM-created range, retained quote, or screenshot alone is insufficient. Repeat button and swipe paths on the foldable cover and inner screens, with Android Studio visual observation. See the build-15 UAT report for results; physical owner acceptance remains separate.
 
 Coordinate-driven handle tests wait for WebView's visual-state callback, the next frame and native UI idle after returning to the page. A JavaScript scroll offset can update before the native handle positions are drawn. Normal regression runs do not use the optional multi-second visual-observation pauses.
+
+Build 15 physical feedback exposed range loss on page changes. [ADR 027](027-resume-adjustable-epub-selection.md) adds restoration when WebView loses the live range.

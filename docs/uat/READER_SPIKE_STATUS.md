@@ -1,12 +1,20 @@
-# Build 15 — ready for Android owner UAT
+# Build 16 — Android reader follow-up
+
+Updated 2026-11-12. Build 16 restores draggable EPUB selection grips when WebView drops its range after a turn. Selected vertical edge swipes use the chapter pager; the sample import action reports each format's outcome and links to the existing books. [Build 16 evidence](BUILD_16_VISUAL_REVIEW.md).
+
+The signed standalone APK is `output/android/readle-uat-16.apk`; SHA-256 `92a99dd630165aee66b660e35b72b502deecb80c0b78fe364c7f7a13d9492f30`. Application ID `com.readle.uat`, signer and SQLite schema 2 are unchanged. Install using **Update**, then run [B16-01..04](ANDROID_UAT.md) on both physical screens. The physical Continuous scroll failure was not reproduced on the API 36 baseline and requires a retest on the Z Fold7. A selection stays within a single EPUB chapter.
+
+The foldable cover suite passed 28 native tests; four focused checks passed unfolded. Three focused checks passed again on the final APK after encoding the marker IDs. Android Studio showed the restored grips and the sample import results. Build 16 owner acceptance is pending.
+
+## Build 15 handoff history
 
 Updated 2026-11-07. Build 15 addresses VIS14-01: ordinary turns preserve the live range and its adjustment handles, while the complete source locator stays independent of the reading page. [Implementation and evidence](BUILD_15_VISUAL_REVIEW.md).
 
-The private standalone APK is `output/android/readle-uat-15.apk`; SHA-256 `06e2f7bfd090d8f0367dbb560945ecc7b919b5a215cb97bd03aab7743e7dc794`. Application ID `com.readle.uat`, signing identity and SQLite schema 2 are unchanged. Install with **Update**, keeping application data. The install helper defaults to build 15; fixtures and [B15-01..07](ANDROID_UAT.md) accompany it.
+The private standalone APK is `output/android/readle-uat-15.apk`; SHA-256 `06e2f7bfd090d8f0367dbb560945ecc7b919b5a215cb97bd03aab7743e7dc794`. Application ID `com.readle.uat`, signing identity and SQLite schema 2 are unchanged. Install with **Update**, keeping application data. Fixtures and the archived [B15-01..07](BUILD_15_CHECKLIST.md) accompany it.
 
 Engineering qualification passes: 23 native tests on Pixel 7 API 36, three consecutive synchronized swipe-to-handle replays without visual pauses, two native-handle tests per foldable screen with Android Studio observation, the complete-locator regression, nine storage/migration checks, four React Native tests, TypeScript, ESLint, native compilation and signing. Final-APK offline restart visibly retained the phone's two sessions and note; cover → inner → cover retained the foldable note and Pages preference. Earlier failed attempts and two host-emulator interruptions are recorded separately in the report.
 
-Physical Samsung Z Fold7 / Android 17 B15 acceptance, native iOS, accessibility, large-book coverage and named-hardware timings remain open. This handoff does not complete Phase A. Native selection across separate chapters remains open.
+The owner later failed B15-02 and B15-04 on Samsung Z Fold7 / Android 17; the remaining behavior was reported working. See [UAT results](UAT_RESULTS.md). Native iOS, accessibility, large-book coverage and named-hardware timings remain open. This handoff does not complete Phase A. Native selection across separate chapters remains open.
 
 ## Build 14 handoff history
 

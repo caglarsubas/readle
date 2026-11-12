@@ -47,8 +47,8 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | CITE-007 | preview permission/caching | C/E2 | Planned in milestone | Planned |
 | CITE-008 | edition mismatch handling | C/E2 | Planned in milestone | Planned |
 | READ-001 | EPUB primary reader; PDF source/reference | A/B/P1 | ReaderActivity single PDF surface; EPUB reflow/layout tests; ADR 023 | Partial, Android; full PDF authoring deferred |
-| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024/025/026; real native handle drags after button/swipe round trips, exact opposite endpoints and release stability | Build 15 engineering checks pass on cover/inner screens; physical B15 UAT and cross-chapter ranges open |
-| ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests and in-reader panels (ADR 025/026) | Partial, Android; Build 15 offline restart/fold restoration observed, physical B15 UAT pending |
+| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024–027; real handle drags after chapter/column return, selected vertical edge swipes, exact opposite endpoints and release stability | Build 15 physical failures recorded; Build 16 physical UAT and cross-chapter ranges open |
+| ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests and in-reader panels (ADR 025/026) | Partial, Android; Build 15 owner reports other behavior working; Build 16 regression follow-up |
 | BOOKMARK-001 | flags/resume | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | AI-001 | contextual chat | C | Planned in milestone | Planned |
 | AI-002 | BYOK provider registry | C | Planned in milestone | Planned |
@@ -73,7 +73,7 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | PASS3-001 | Independent deterministic assessment | E | Planned in milestone | Planned |
 | CHECKPOINT-001 | ungraded section end | D/E | Planned in milestone | Planned |
 | RECOVERY-001 | See specification | E | Planned in milestone | Planned |
-| ANCHOR-001 | source locator | A/D | Exact EPUB DOM endpoints and quote verification; unchanged complete locator after page turns; defensive parser copies; LibraryPersistenceTest | Partial, Android; Build 15 locator regression passes |
+| ANCHOR-001 | source locator | A/D | Exact EPUB DOM endpoints and quote verification; unchanged complete locator after page turns; defensive parser copies; LibraryPersistenceTest | Partial, Android; exact-source restoration after dropped ranges in Build 16 |
 | DET-001 | detour/resume | C/E | Planned in milestone | Planned |
 | VIS-001 | safe interactive visual | E | Planned in milestone | Planned |
 | PRIV-001 | privacy/egress | B/C | Planned in milestone | Planned |
@@ -92,4 +92,4 @@ Build 11 owner UAT changes the original scope: annotations belong to sessions, n
 
 Build 12 owner UAT accepts the remaining checklist items and identifies two EPUB gesture failures. Build 13 adds actual native gesture coverage and the pinned SDK correction in [ADR 024](adr/024-epub-selection-gestures.md). Programmatically constructing a DOM range remains storage evidence only, not gesture acceptance.
 
-Build 15 resolves VIS14-01 in engineering checks: 23 native tests, three consecutive synchronized swipe-to-handle replays and Android Studio visual observation on both foldable screens. The original complete-locator assertion remains unchanged. See [ADR 026](adr/026-live-selection-page-turns.md), [qualification evidence](uat/BUILD_15_VISUAL_REVIEW.md) and [B15-01..07](uat/ANDROID_UAT.md). Physical Samsung Z Fold7 / Android 17 acceptance remains pending.
+Build 15 resolves VIS14-01 in engineering checks: 23 native tests, three consecutive synchronized swipe-to-handle replays and Android Studio visual observation on both foldable screens. The original complete-locator assertion remains unchanged. See [ADR 026](adr/026-live-selection-page-turns.md), [qualification evidence](uat/BUILD_15_VISUAL_REVIEW.md) and [B15-01..07](uat/BUILD_15_CHECKLIST.md). The owner subsequently reported B15-02 and B15-04 failures. See [Build 16 evidence](uat/BUILD_16_VISUAL_REVIEW.md) and [B16-01..04](uat/ANDROID_UAT.md) for the current retest.

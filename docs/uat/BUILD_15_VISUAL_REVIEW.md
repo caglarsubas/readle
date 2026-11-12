@@ -67,6 +67,8 @@ On the final APK, an actual phone force-stop/offline reopen visibly showed both 
 
 ## Handoff and rollback
 
-Run [B15-01..07](ANDROID_UAT.md), especially B15-02 and B15-03, on both physical Z Fold7 screens and an EPUB that reproduced the issue. Record device, Android version, fold state and expected/observed results independently of engineering checks.
+Run [B15-01..07](BUILD_15_CHECKLIST.md), especially B15-02 and B15-03, on both physical Z Fold7 screens and an EPUB that reproduced the issue. Record device, Android version, fold state and expected/observed results independently of engineering checks.
 
 Physical owner UAT, cross-chapter native ranges, iOS, accessibility, large-book coverage and named-hardware p95 measurements remain open. The next release gate remains evidence based; this slice does not complete Phase A or unlock broad AI-course work by itself. Rollback uses a schema-2-compatible fix-forward APK with the same signer and a higher version code. Keep app data installed.
+
+On 2026-11-12 the owner reported B15-02 and B15-04 failures and a possible sample-import issue. See [the physical record](UAT_RESULTS.md#build-15--owner-feedback--2026-11-12).

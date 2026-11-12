@@ -1,0 +1,55 @@
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+com.readle.reader.HighlightInteractionTest:
+INSTRUMENTATION_STATUS: test=continuousChapterSwipesPreserveSelectedSourceInBothDirections
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=continuousChapterSwipesPreserveSelectedSourceInBothDirections
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1224)
+	at com.readle.reader.HighlightInteractionTest.paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter(HighlightInteractionTest.kt:604)
+
+INSTRUMENTATION_STATUS: stream=
+Error in paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter(com.readle.reader.HighlightInteractionTest):
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1224)
+	at com.readle.reader.HighlightInteractionTest.paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter(HighlightInteractionTest.kt:604)
+
+INSTRUMENTATION_STATUS: test=paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 12.416
+There was 1 failure:
+1) paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter(com.readle.reader.HighlightInteractionTest)
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1224)
+	at com.readle.reader.HighlightInteractionTest.paginatedSelectionIsAdjustableAfterLeavingAndReturningToItsChapter(HighlightInteractionTest.kt:604)
+
+FAILURES!!!
+Tests run: 2,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

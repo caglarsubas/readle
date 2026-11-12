@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.graphics.pdf.PdfRenderer
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.util.Base64
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
@@ -59,6 +60,7 @@ class ReaderActivity : AppCompatActivity() {
     private var findJob: Job? = null
     private var turningPage = false
     private var selectionKept = false
+    private var selectionToResume: JSONObject? = null
     private var epub: EpubNavigatorFragment? = null
     private var publication: Publication? = null
     private var pdf: PdfRenderer? = null
@@ -288,6 +290,7 @@ class ReaderActivity : AppCompatActivity() {
                         locator.title ?: "EPUB position ${locator.locations.position ?: 1}",
                     )
                 }
+                resumeTurnSelection(navigator)
                 updateEpubStatus(locator)
                 applyEpubHighlights()
             }
@@ -377,7 +380,12 @@ class ReaderActivity : AppCompatActivity() {
                 parseEpubLocator(it)?.let { anchor ->
                     decorations.add(
                         Decoration(
-                            "selection",
+                            // An ID reused across chapters is treated as an update in
+                            // the new resource, leaving a stale marker in the old one.
+                            "selection:" + Base64.encodeToString(
+                                anchor.href.toString().toByteArray(),
+                                Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING,
+                            ),
                             anchor,
                             Decoration.Style.Highlight(0xFFB5D4DF.toInt()),
                         )
@@ -568,8 +576,14 @@ class ReaderActivity : AppCompatActivity() {
         return true
     }
 
-    private fun turnPage(forward: Boolean) {
+    private suspend fun resumeTurnSelection(navigator: EpubNavigatorFragment) {
+        val pending = selectionToResume ?: return
+        if (navigator.resumeReadleSelection(pending) && selectionToResume === pending) {
+            selectionToResume = null
+        }
+    }
 
+    private fun turnPage(forward: Boolean) {
         val navigator = epub
         if (navigator == null) {
             if (pdf != null) showPdf(pageIndex + if (forward) 1 else -1)
@@ -579,15 +593,19 @@ class ReaderActivity : AppCompatActivity() {
         turningPage = true
         lifecycleScope.launch {
             try {
-                if (captureSelection()) {
+                val captured = captureSelection()
+                if (captured) {
                     selectionKept = true
-                    // Keep Chromium's live range and handles while moving within
-                    // the resource. The session snapshot also survives a chapter turn.
-                    applyEpubHighlights()
+                    selectionToResume = selectedLocator
                 }
                 panel.close()
-                if (forward) navigator.goForward(animated = false)
-                else navigator.goBackward(animated = false)
+                if (navigator.readleTurnPage(forward, selectionToResume != null)) {
+                    // The debounced reading locator might never change on a quick round trip.
+                    resumeTurnSelection(navigator)
+                } else if (captured) {
+                    selectionToResume = null
+                }
+                if (captured) applyEpubHighlights()
                 updateEpubStatus()
             } finally {
                 turningPage = false
@@ -624,6 +642,7 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun setEpubLayout(scroll: Boolean) = lifecycleScope.launch {
+        selectionToResume = null
         if (captureSelection()) {
             selectionKept = true
             epub?.clearSelection()
@@ -665,6 +684,7 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun annotationDeleted(row: JSONObject) {
         if (selectedLocator?.toString() == row.getString("locator")) {
+            selectionToResume = null
             selectedLocator = null
             selectedQuote = ""
             selectionKept = false
@@ -675,12 +695,14 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun openAnnotationSource(row: JSONObject) {
+        selectionToResume = null
         rememberSelection(JSONObject(row.getString("locator")), row.getString("quote"))
         if (epub != null) parseEpubLocator(selectedLocator!!)?.let { epub?.go(it) }
         else showPdf(selectedLocator!!.getInt("pageIndex"))
     }
 
     private fun selectionActions() = lifecycleScope.launch {
+        selectionToResume = null
         if (captureSelection()) epub?.clearSelection()
         if (selectedLocator == null) {
             Toast.makeText(this@ReaderActivity, "Long press a passage first.", Toast.LENGTH_SHORT)
@@ -796,6 +818,7 @@ class ReaderActivity : AppCompatActivity() {
 
     private fun saveAnnotation(note: String) {
         val locator = selectedLocator ?: return
+        selectionToResume = null
         database.annotate(sessionId, locator, selectedQuote, note)
         selectionKept = false
         if (epub != null) updateEpubStatus()
@@ -842,6 +865,7 @@ class ReaderActivity : AppCompatActivity() {
             AlertDialog.Builder(this)
                 .setTitle("Contents")
                 .setItems(links.map { it.title ?: it.href.toString() }.toTypedArray()) { _, which ->
+                    selectionToResume = null
                     epub?.go(links[which])
                 }
                 .show()
@@ -946,6 +970,7 @@ class ReaderActivity : AppCompatActivity() {
                             val chapter = locator.title ?: "Passage"
                             results.addView(
                                 panel.action("$chapter\n$excerpt") {
+                                    selectionToResume = null
                                     panel.close()
                                     lifecycleScope.launch {
                                         if (captureSelection()) {

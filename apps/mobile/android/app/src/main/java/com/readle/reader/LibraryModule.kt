@@ -100,14 +100,17 @@ class LibraryModule(private val context: ReactApplicationContext) :
     @ReactMethod
     fun importFixtures(promise: Promise) =
         async(promise) {
-            listOf("readle-sample.pdf", "readle-sample.epub").forEach { name ->
+            val results = JSONArray()
+            listOf("readle-sample.epub", "readle-sample.pdf").forEach { name ->
                 val file = File(context.cacheDir, name)
                 context.assets.open("fixtures/$name").use { input ->
                     file.outputStream().use { input.copyTo(it) }
                 }
-                importer.process(importer.register(Uri.fromFile(file), name))
+                val id = importer.register(Uri.fromFile(file), name)
+                importer.process(id)
+                results.put(database.query("SELECT * FROM imports WHERE id = ?", arrayOf(id)).getJSONObject(0))
             }
-            database.query("SELECT * FROM imports ORDER BY rowid DESC")
+            results
         }
 
     @ReactMethod

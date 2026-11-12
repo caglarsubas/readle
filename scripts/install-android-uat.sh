@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-build_number="${1:-15}"
+build_number="${1:-16}"
 [[ "$build_number" =~ ^[1-9][0-9]*$ ]] || { echo 'Supply a positive build number.' >&2; exit 1; }
 readle_adb="${READLE_ADB:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb}"
 apk_dir="$root/output/android"

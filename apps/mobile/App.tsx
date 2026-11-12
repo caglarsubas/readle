@@ -77,6 +77,7 @@ function LibraryScreen() {
   const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [sampleItems, setSampleItems] = useState<ImportItem[]>([]);
   const refresh = useCallback(async () => {
     if (!library) {
       return;
@@ -227,8 +228,38 @@ function LibraryScreen() {
                     <Action
                       label="Add sample books"
                       secondary
-                      onPress={() => run(() => library!.importFixtures())}
+                      onPress={() => run(async () => {
+                        setSampleItems([]);
+                        setSampleItems(await library!.importFixtures());
+                      })}
                     />
+                    {sampleItems.length > 0 && (
+                      <View accessibilityLiveRegion="polite" style={styles.sampleResult}>
+                        {sampleItems.map(item => {
+                          const format = item.name.endsWith('.epub') ? 'EPUB' : 'PDF';
+                          const sample = books.find(book => book.id === item.bookId);
+                          return (
+                            <View key={item.id}>
+                              <Text style={item.status === 'failed' ? styles.error : styles.body}>
+                                {`Sample ${format}: ${item.status === 'ready' ? 'added to your library' : item.status === 'duplicate' ? 'already in your library' : item.error || 'could not be added'}`}
+                              </Text>
+                              {sample && (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  style={styles.back}
+                                  onPress={() => {
+                                    setSessions([]);
+                                    setSelected(sample);
+                                  }}
+                                >
+                                  <Text style={styles.link}>{`View sample ${format}`}</Text>
+                                </Pressable>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 )}
                 {books.length === 0 && (
@@ -387,6 +418,7 @@ const styles = StyleSheet.create({
   },
   body: { fontSize: 15, lineHeight: 23, color: '#626A60' },
   actions: { gap: 10, marginVertical: 24 },
+  sampleResult: { padding: 12, backgroundColor: '#E9EEE5', borderRadius: 8, gap: 8 },
   button: {
     minHeight: 48,
     backgroundColor: '#355742',

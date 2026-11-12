@@ -82,6 +82,25 @@ The Build 14 → candidate 15 → final 15 chain retained old work without clear
 
 The signed APK, fixtures, upgrade guidance and B15-01..07 checklist are ready. The install helper defaults to build 15. **Physical Samsung Z Fold7 / Android 17 owner acceptance has not been reported.** Emulator results do not supply that acceptance or the native iOS gate.
 
+## Build 15 — owner feedback — 2026-11-12
+
+Reported in this chat on the previously recorded Samsung Z Fold7 / Android 17 setup. The report supersedes the pending Build 15 owner UAT status above. No per-screen results or timings were supplied.
+
+| Item | Owner observation |
+|---|---|
+| B15-02 | **Fail, EPUB.** After a page change, the blue selection became light blue and was no longer functional as a selection. The owner did not see this in PDF. |
+| B15-04 | **Fail, EPUB Continuous scroll.** Edge swipes do not work with words selected. The same interaction works in Pages. |
+| Remaining checklist behavior | Reported working. This does not mark the repeated B15-02/B15-04 portions of the foldable check as passing. |
+| Add sample books | Possibly not working; owner expressed uncertainty. Track separately from confirmed failures. |
+
+Build 15 is not accepted for the two selection cases. [Original Build 15 checklist](BUILD_15_CHECKLIST.md). Emulator and CI results remain engineering evidence only.
+
+## Build 16 — engineering handoff — 2026-11-12
+
+Build 16 restores dropped EPUB ranges with draggable grips, uses the chapter pager for selected vertical edge swipes, removes stale source markers and reports sample import results beside the button. The unchanged Build 15 APK reproduced a lost adjustable range after a chapter round trip. Its selected chapter-edge swipe regression passed on the emulator; the owner's Continuous scroll failure requires the physical retest.
+
+The foldable cover suite passed 28 tests and the inner screen passed four focused tests before the final URL-safe marker-ID encoding. The signed final APK passed three focused cover regressions and showed the two sample import results offline. The sample links opened their matching formats with existing sessions. Five React Native tests, TypeScript, lint, native build/test compilation and signing checks passed. See [Build 16 evidence](BUILD_16_VISUAL_REVIEW.md) and [B16-01..04](ANDROID_UAT.md). Physical owner acceptance has not been reported.
+
 ## Open evidence and rollback
 
 Cross-screen EPUB selection is qualified within one chapter/spine resource; a range across separate chapters remains open. Advanced PDF reflow and cross-page authoring are deferred by the accepted format scope. Build-12 physical Z Fold7 fold/unfold was accepted in the owner report. Native iOS integration, full TalkBack/VoiceOver journeys, large-book coverage and named-hardware p95 timing remain pending. EPUB selection gesture acceptance remains open.

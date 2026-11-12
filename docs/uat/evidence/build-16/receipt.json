@@ -1,0 +1,51 @@
+{
+  "build": 16,
+  "date": "2026-11-12",
+  "applicationId": "com.readle.uat",
+  "versionName": "0.1.0-spike",
+  "minSdk": 24,
+  "targetSdk": 36,
+  "sqliteSchema": 2,
+  "apkSha256": "92a99dd630165aee66b660e35b72b502deecb80c0b78fe364c7f7a13d9492f30",
+  "signerSha256": "0a6ed121b47b392614698fa2b9e20555c43f8990dcf9ca3270b597fc8163cea5",
+  "fixtures": "readle-uat-16-fixtures.zip",
+  "fixtureSha256": "9fcc7e9b8eaaacb461b127db9f7dd6aa1f7fe30dc810007df1bcc0b31b90b26d",
+  "sourceSha256": {
+    "apps/mobile/App.tsx": "f73dd596ec453051bf30e24b1ec2bdc7134e0195466ad071d37c936704b0c2a2",
+    "apps/mobile/__tests__/App.test.tsx": "0c12d94c56afa1c3dc7adae4e17ee4ccfc0eb79273a431060a4ccc28e7963e12",
+    "apps/mobile/android/app/src/main/java/com/readle/reader/ReaderActivity.kt": "c77421f8f581f6e6249ef587ddd720083ed8dc386520ad21ff1cc1e22f18c466",
+    "apps/mobile/android/app/src/main/java/com/readle/reader/LibraryModule.kt": "a2f0669b4c15fa513065cb6b3c86f424150a308d127995ffcec01aecb8372c96",
+    "apps/mobile/android/app/src/androidTest/java/com/readle/reader/HighlightInteractionTest.kt": "ef84ac19e1d66414fbfe5d0d38b59c035c00de4a5eb1a66c0fa1d1b211b27928",
+    "patches/readium-selection.patch": "c9962e60b5a53c7a08bbe5d0f96447825b9fd0b7c0a2a86cbebcc53c1ccef62f",
+    "patches/readium-selection-anchors.js": "a4f9dc99b66df51b65a64d6cc5364783229cd086669f5c2e738a224865e492a6"
+  },
+  "upgrade": "Build 15 to unpublished Build 16 candidates to final Build 16 in place; retained existing sample sessions",
+  "installedApkVerified": true,
+  "about": "0.1.0-spike \u00b7 Build 16",
+  "emulator": "Pixel Fold Android 16 API 36, airplane mode with Wi-Fi disabled",
+  "engineering": {
+    "finalCover": "3 focused regressions, no visual pauses",
+    "preEncodingCover": "28 native tests, no visual pauses",
+    "preEncodingInner": "4 focused tests with visual checkpoints",
+    "nativeCandidateSha256": "0faed59c5a0fe9b4e1169f1219ca3118a379a54772604080c275ce83665e5609",
+    "preMarkerFixCoverFallbackSha256": "461db548fab4496573b1bdb13fc826b926dff731b05d6cfe28a0a6bb634eae31",
+    "reactNative": "5 passed, TypeScript and ESLint passed",
+    "sampleImport": "Both existing samples reported already present offline. Both links opened the matching format with one existing session."
+  },
+  "physicalUAT": "Build 15 B15-02 and B15-04 failed by owner report. Build 16 B16-01..04 pending on Samsung Z Fold7 / Android 17.",
+  "artifacts": {
+    "build15-baseline.txt": "2d40725f6138a3449333e36938c16118b3fbf68e9fb7547750a0495ab16013fa",
+    "cover-before-marker-encoding.txt": "2f7aac0ca308b244f8d0f088ae46acb353f5704ec456752b48b95dbd93fd59d0",
+    "cover-final-focused.txt": "73d4e4d62630d98730985a9b50daab93097b29870863256f3d445603be492251",
+    "cover-first-native.txt": "2b560b438beb781f86ffb1c71aacfaedcebb31acb54b63b38a02fd5428617ec4",
+    "cover-pdf-replay.txt": "c80e3f0e1b42e68973e14b17a44db14efed5790ea05eda9a6e0edc7a133d04a9",
+    "cover-range-adjusted.png": "c01d2d537590c951cdde6ac077b1c55147eb7f505461b973ec499d11196e89d3",
+    "cover-range-returned.png": "99ebc88b7b11abc4592b32e720feae174b327bbc9bbf9f87897784e1982eeab4",
+    "cover-recovered.txt": "abf67f493e2620508672da836bbf2274a4db7a8e3e94c571129c5ab51249b6bf",
+    "cover-samples.png": "5f873fe0e06d90bc3fcb12773c783bf46c880bdc43d26b9873ccc670f1b76b9a",
+    "inner-chapter-selection-adjusted.png": "3979b38b0c160c08c920af7e6d190a3f0beb150ae72c64421392bd9ac4ec31c4",
+    "inner-chapter-selection-returned.png": "b16db8c450cc70e6682b528a76bf1fd75acb3355aea8f7c827ef90c30bb09cc7",
+    "inner-focused.txt": "c52919d7727a98cddad40df9a2872484bbd908b89153127f5c9fc47a48fdf487",
+    "inner-scroll-restored-handle-stopped.png": "5b7db6fa6860aebfce1743a209071529f9ba4d30ce8d2e0742785fe71250e365"
+  }
+}

@@ -1,25 +1,16 @@
-# Build 15 — Android reader UAT
+# Build 16 — Android reader UAT
 
-Engineering checks passed: 23 native tests, three consecutive swipe-to-handle replays, and Android Studio visual review on both foldable screens. Physical owner acceptance is pending; see [the results and evidence](BUILD_15_VISUAL_REVIEW.md).
+Open `readle-uat-16.apk` on your Samsung Z Fold7 and choose **Update**. Keep the installed app and its data. The APK uses the same application ID (`com.readle.uat`), signing certificate and database schema as Build 15. It works offline without a development server. In Library → About, confirm **Version 0.1.0-spike · Build 16**.
 
-Open the privately supplied `readle-uat-15.apk` on your Samsung Z Fold7 and choose **Update** over the existing Readle UAT app. Keep the app and its data installed. Build 15 uses the same `com.readle.uat` application ID, signing certificate and SQLite schema 2 as builds 13/14. It runs without a development server or AI key.
-
-Open Library → **About** and confirm **Version 0.1.0-spike · Build 15**. Use an existing EPUB plus **Add sample books** or `readle-uat-15-fixtures.zip`. The sample's repeated paragraphs are intentional.
-
-This build addresses VIS14-01: ordinary page turns retain the live native selection, so its handles can be dragged after returning to the source page. The exact selected source locator stays separate from the current reading page. See [ADR 026](../adr/026-live-selection-page-turns.md) and [Build 15 evidence](BUILD_15_VISUAL_REVIEW.md). Owner results on the physical Z Fold7 / Android 17 remain separate from emulator checks.
+Repeat the two failed Build 15 checks with the EPUB where you saw the issue. Use both the cover and unfolded screen. **Add sample books** or `readle-uat-16-fixtures.zip` provides the comparison books.
 
 | ID | Action | Expected |
 |---|---|---|
-| B15-01 | Update the installed app, open About, and resume an old session. | About shows build 15. Existing books, distinct sessions, notes, highlights and layout choices remain. |
-| B15-02 | In Pages, long-press a word. Tap Next, then Previous. Drag the returned selection's end handle to the right text edge and hold; release it. | The same word remains selected with usable native handles. The range extends onto the next page, its starting boundary stays fixed, and turning stops after release. No second long press is needed. |
-| B15-03 | On a later page, select a word. Swipe to the previous page and then back. Drag the selection's start handle to the left text edge and hold; release it. | The same range and handles return. Extension moves backward, its ending boundary stays fixed, and turning stops after release. |
-| B15-04 | In Continuous scroll, select a word and swipe vertically. At a chapter edge, swipe again to cross it. Switch to Pages and swipe horizontally. | Scroll moves text vertically while retaining the selected word. Chapter-edge navigation works in both directions. Pages moves horizontally. |
-| B15-05 | Open Selection → Add note, save, edit the saved note, and use Open source. Open Notes and press Android Back. Then explicitly Clear selection and select another word. | Actions stay inside the reader; edits remain on the original source range. Back closes Notes. Clear selection allows a fresh range without bringing back the old one. |
-| B15-06 | In airplane mode, Find `hypothetical linear response` in the sample EPUB and open the hit. Try an absent phrase. | The hit opens chapter 2 and marks the exact phrase. An absent phrase shows “No matches found.” |
-| B15-07 | Repeat B15-02..06 on cover and inner screens. Save a long highlight, force-stop, reopen through Library, and fold/unfold. Open another session for the same book. | Saved source passages, notes and layout survive. Each session keeps its own workspace; a new session starts blank. |
+| B16-01 | In EPUB **Pages**, long-press a word, turn away, and turn back. Drag a handle without another long press. Try once within the chapter and once from the last page into the next chapter and back. | The same words return as an adjustable selection with grips. Dragging changes the selected words, leaves the opposite endpoint fixed, and stops on release. The extended passage can be highlighted or annotated. |
+| B16-02 | In **Continuous scroll**, select text near a chapter edge. Swipe vertically in the text away from the handles, first forward at the bottom, then backward at the top of the next chapter. On the original chapter, also try holding a handle near the top or bottom of the screen. | A swipe from a chapter edge opens the neighboring chapter while the selected passage remains available. Holding a handle scrolls within the chapter and extends the range; releasing stops it. |
+| B16-03 | From Library, tap **Add sample books** in airplane mode. Tap **View sample EPUB** and **View sample PDF**. Repeat the import. | Each format reports whether it was added, is already present, or failed. Each available sample opens its existing book and sessions. Repeating the action does not create duplicate books or sessions. |
+| B16-04 | Open an existing session and a new session for the same book. Check Notes, EPUB Find, PDF source reading, and reopening after force-stop. | The existing session restores its own work, the new one is blank, and the previously working reader actions still work. |
 
-Native selection extension is supported across pages of one chapter/resource. Cross-chapter native ranges remain open; chapter transitions preserve the saved quote. Fixed-layout EPUB stays in Pages. PDF remains source/reference under the accepted EPUB-first scope.
+A single EPUB selection is scoped to one chapter. Crossing into another chapter keeps the source passage; returning to the source restores its grips if WebView discarded them. Report the item, result, book, screen and whether a chapter boundary was crossed.
 
-Report Pass / Fail / Blocked per item, fold state, book and expected versus observed behavior. Physical-device, iOS, accessibility and named-hardware timing gates remain independent.
-
-Previous checklist: [Build 14](BUILD_14_CHECKLIST.md). Earlier observations: [Build 14 follow-up](BUILD_14_VISUAL_FOLLOWUP.md).
+[Build 15 checklist](BUILD_15_CHECKLIST.md) · [Owner feedback](UAT_RESULTS.md) · [Build 16 verification](BUILD_16_VISUAL_REVIEW.md)
