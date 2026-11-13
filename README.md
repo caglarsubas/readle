@@ -2,7 +2,7 @@
 
 Readle helps learners follow a recommended walkthrough through a book's ideas, with independent, resumable sessions and direct access to the original source. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
 
-Android Build 17 includes a curated walkthrough for *Identity Management for Agentic AI* (arXiv:2510.25819v1). The learner chooses a goal and experience level, works through a recommended lesson sequence, and can inspect the cited PDF pages. The EPUB reader, PDF reference view and local sessions are also available. Automatic learning edition generation, the native iOS reader, AI chat and sync are pending.
+Android Build 17 includes a curated walkthrough for *Identity Management for Agentic AI* (arXiv:2510.25819v1). The learner chooses a goal and experience level, works through a recommended lesson sequence, and can inspect the cited PDF pages. The EPUB reader, PDF reference view and local sessions are also available. The local development harness can generate three-pass walkthroughs from text PDFs. Mobile generation, the native iOS reader, AI chat and sync are pending. [Whole-document walkthrough test](docs/uat/AUTOMATIC_WALKTHROUGH.md).
 
 ## Run and build
 
