@@ -46,9 +46,9 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | CITE-006 | bibliographic discovery | C/E2 | Planned in milestone | Planned |
 | CITE-007 | preview permission/caching | C/E2 | Planned in milestone | Planned |
 | CITE-008 | edition mismatch handling | C/E2 | Planned in milestone | Planned |
-| READ-001 | PDF/EPUB | A/B | ReaderActivity/PdfViewport; native pinch/double-tap and EPUB reopen tests; build 10 owner UAT | Partial, Android |
-| SEL-001 | selection toolbar | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
-| ANN-001 | highlights/notes and saved-object actions | A/B | AnnotationActions; LibraryPersistenceTest scoped/stale edit and delete; HighlightInteractionTest PDF/EPUB touch, reflow/reopen | Partial, Android build 11; physical follow-up pending |
+| READ-001 | EPUB primary reader; PDF source/reference | A/B/P1 | ReaderActivity single PDF surface; EPUB reflow/layout tests; ADR 023 | Partial, Android; full PDF authoring deferred |
+| SEL-001 | Native EPUB scrolling while selected and handle-driven page extension | A/B | ADR 024–027; real handle drags after chapter/column return, selected vertical edge swipes, exact opposite endpoints and release stability | Build 15 physical failures recorded; Build 16 physical UAT and cross-chapter ranges open |
+| ANN-001 | Session-owned highlights/notes and object actions | A/B | Schema 2; session scope/CAS tests; AnnotationMigrationTest; EPUB/PDF interaction tests and in-reader panels (ADR 025/026) | Partial, Android; Build 15 owner reports other behavior working; Build 16 regression follow-up |
 | BOOKMARK-001 | flags/resume | A/B | Android reader/storage/importer; LibraryPersistenceTest | Partial |
 | AI-001 | contextual chat | C | Planned in milestone | Planned |
 | AI-002 | BYOK provider registry | C | Planned in milestone | Planned |
@@ -73,7 +73,7 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | PASS3-001 | Independent deterministic assessment | E | Planned in milestone | Planned |
 | CHECKPOINT-001 | ungraded section end | D/E | Planned in milestone | Planned |
 | RECOVERY-001 | See specification | E | Planned in milestone | Planned |
-| ANCHOR-001 | source locator | A/D | Android reader/storage/importer; LibraryPersistenceTest | Partial |
+| ANCHOR-001 | source locator | A/D | Exact EPUB DOM endpoints and quote verification; unchanged complete locator after page turns; defensive parser copies; LibraryPersistenceTest | Partial, Android; exact-source restoration after dropped ranges in Build 16 |
 | DET-001 | detour/resume | C/E | Planned in milestone | Planned |
 | VIS-001 | safe interactive visual | E | Planned in milestone | Planned |
 | PRIV-001 | privacy/egress | B/C | Planned in milestone | Planned |
@@ -81,9 +81,15 @@ All 77 original IDs and the two session additions are tracked below. Partial mea
 | SYNC-001 | Offline conflict-safe multi-device sync | F | Planned in milestone | Planned |
 | A11Y-001 | Accessible interactions | A/B/F | Native object menus/notes list; PDF per-highlight accessibility actions tested | Partial; comprehensive assistive-technology acceptance open |
 | EVAL-001 | source validation and educational quality | D/E/F | Planned in milestone | Planned |
-| SESSION-001 | Per-book discover/create/list and global Continue | A/B | Android SQLite/LibraryModule/App; session isolation instrumentation | Partial, Android |
-| SESSION-002 | Independent durable workspace restoration | A/B/C/E/F | SQLite state and native locator restoration; persistence/CAS instrumentation | Partial, Android reader |
+| SESSION-001 | Discover/resume existing sessions; create a blank session | A/B | Android SQLite/LibraryModule/App; new session has zero annotations | Partial, Android |
+| SESSION-002 | Independent workspace and annotation restoration | A/B/C/E/F | Schema 1→2 migration, scoped notes/selection and native EPUB range restoration; Build 15 offline restart and update-chain evidence | Partial, Android reader; chat/learning restoration awaits those features |
 
 Backend `/v1/books/{id}/sessions` and session update endpoints are planned. The working Android path is a local native bridge and requires no backend.
 
 Build 10: the product owner reported all Android checklist items passed on Samsung Z Fold7 / Android 17 on 2026-11-05. Build 11 addresses saved-highlight actions and PDF ergonomics. See [UAT results](uat/UAT_RESULTS.md) for the distinction between user reports, local tests and pending physical/iOS evidence.
+
+Build 11 owner UAT changes the original scope: annotations belong to sessions, new sessions are blank, EPUB is the primary reading/learning format, and PDF is an original-source reference view. [ADR 022](adr/022-session-annotations.md) and [ADR 023](adr/023-epub-first.md) supersede conflicting earlier requirements; the original 77 IDs plus SESSION-001/002 remain tracked.
+
+Build 12 owner UAT accepts the remaining checklist items and identifies two EPUB gesture failures. Build 13 adds actual native gesture coverage and the pinned SDK correction in [ADR 024](adr/024-epub-selection-gestures.md). Programmatically constructing a DOM range remains storage evidence only, not gesture acceptance.
+
+Build 15 resolves VIS14-01 in engineering checks: 23 native tests, three consecutive synchronized swipe-to-handle replays and Android Studio visual observation on both foldable screens. The original complete-locator assertion remains unchanged. See [ADR 026](adr/026-live-selection-page-turns.md), [qualification evidence](uat/BUILD_15_VISUAL_REVIEW.md) and [B15-01..07](uat/BUILD_15_CHECKLIST.md). The owner subsequently reported B15-02 and B15-04 failures. See [Build 16 evidence](uat/BUILD_16_VISUAL_REVIEW.md) and [B16-01..04](uat/ANDROID_UAT.md) for the current retest.

@@ -1,0 +1,15 @@
+
+> Readle@0.0.1 test
+> jest --runInBand
+
+PASS __tests__/App.test.tsx
+  ✓ inspecting a book lists its saved sessions without creating one (404 ms)
+  ✓ continue latest opens the saved session ID (18 ms)
+  ✓ start new session opens the newly created workspace (16 ms)
+  ✓ About shows the installed package version and can return to the library (16 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        1.02 s
+Ran all test suites.

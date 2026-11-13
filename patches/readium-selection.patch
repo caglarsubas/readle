@@ -1,0 +1,259 @@
+--- a/src/main/java/org/readium/r2/navigator/R2BasicWebView.kt
++++ b/src/main/java/org/readium/r2/navigator/R2BasicWebView.kt
+@@ -73,6 +73,7 @@
+         fun onProgressionChanged() {}
+         fun goForward(animated: Boolean = false): Boolean = false
+         fun goBackward(animated: Boolean = false): Boolean = false
++        fun onReadlePageTurn(forward: Boolean) {}
+
+         /**
+          * Returns the custom [ActionMode.Callback] to be used with the text selection menu.
+@@ -114,7 +115,15 @@
+     internal val scrollModeFlow = MutableStateFlow(false)
+
+     /** Indicates that a user text selection is active. */
+-    internal var isSelecting = false
++    @Volatile internal var isSelecting = false
++
++    @Volatile internal var readleHandleDragging = false
++        private set
++
++    @android.webkit.JavascriptInterface
++    fun onReadleHandleDrag(dragging: Boolean) {
++        readleHandleDragging = dragging
++    }
+
+     val scrollMode: Boolean get() = scrollModeFlow.value
+     var disablePageTurnsWhileScrolling: Boolean = false
+@@ -192,6 +201,11 @@
+         // dragging the text selection handles.
+         // See https://github.com/readium/kotlin-toolkit/issues/325
+         if (isSelecting) {
++            // Keep the column guard, but let native handles/panning scroll the active text axis.
++            if (scrollMode) {
++                if (listener?.verticalText == true) super.onOverScrolled(scrollX, this.scrollY, clampedX, true)
++                else super.onOverScrolled(this.scrollX, scrollY, true, clampedY)
++            }
+             return
+         }
+
+@@ -634,7 +648,9 @@
+             customCallback,
+             callback2 = callback as? ActionMode.Callback2
+         )
+-        return parent.startActionModeForChild(this, wrapper, type)
++        return parent.startActionModeForChild(this, wrapper, type)?.let {
++            ReadleSelectionActionMode(it, this)
++        }
+     }
+
+     @RequiresApi(Build.VERSION_CODES.M)
+--- a/src/main/java/org/readium/r2/navigator/R2WebView.kt
++++ b/src/main/java/org/readium/r2/navigator/R2WebView.kt
+@@ -690,7 +690,41 @@
+         }
+     }
+
++    private val readleGesture = ReadlePageGesture(this) { direction ->
++        // A rounded CSS scroll extent can leave a fraction of a device pixel at the edge.
++        val tolerance = android.view.ViewConfiguration.get(context).scaledTouchSlop
++        !canScrollVertically(direction) || if (direction < 0) scrollY <= tolerance
++        else scrollY + height >= computeVerticalScrollRange() - tolerance
++    }
++
++    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
++        if (event.actionMasked == MotionEvent.ACTION_DOWN && isSelecting) {
++            // Keep this stream in the active resource; the outer pager can otherwise
++            // intercept a diagonal edge swipe while the selection owns the WebView.
++            parent?.requestDisallowInterceptTouchEvent(true)
++        }
++        if (scrollMode || isSelecting || readleGesture.tracking) {
++            val forward = readleGesture.track(event)
++            if (forward != null && !readleHandleDragging) listener?.onReadlePageTurn(forward)
++        }
++        return super.dispatchTouchEvent(event)
++    }
++
++    @android.webkit.JavascriptInterface
++    fun onReadleHandlePage(direction: Int) {
++        if (direction != -1 && direction != 1) return
++        post {
++            if (!readleHandleDragging || !isAttachedToWindow || scrollMode) return@post
++            val page = mCurItem + direction
++            if (page in 0 until numPages) setCurrentItem(page, false)
++        }
++    }
++
+     override fun onTouchEvent(ev: MotionEvent): Boolean {
++        if (scrollMode || isSelecting || readleGesture.tracking) {
++            // Let WebView pan vertically and continue moving its native selection handles.
++            return super.onTouchEvent(ev)
++        }
+         if (mVelocityTracker == null) {
+             mVelocityTracker = VelocityTracker.obtain()
+         }
+@@ -867,6 +901,13 @@
+         currentVelocity: Int,
+         deltaX: Int,
+     ): Int {
++        // A deliberate drag across a third of the viewport turns a page even
++        // when the finger slows before release. Keep short, fast flings below.
++        val dragThreshold = (getClientWidth() ?: width) / 3
++        if (dragThreshold > 0 && abs(deltaX) > dragThreshold) {
++            return currentPage + if (deltaX < 0) 1 else -1
++        }
++
+         // If the initialVelocity and currentVelocity don't have the same sign, it means the user
+         // reversed the drag direction. In which case we consider this as a cancellation.
+         val isCancelled = (initialVelocity * currentVelocity) <= 0
+--- a/src/main/java/org/readium/r2/navigator/epub/EpubNavigatorFragment.kt
++++ b/src/main/java/org/readium/r2/navigator/epub/EpubNavigatorFragment.kt
+@@ -701,12 +701,26 @@
+         inputListener.remove(listener)
+     }
+
++    // Readle handles deliberate turns so the session can retain the selected source range.
++    public var readlePageTurn: ((Boolean) -> Unit)? = null
++
++    /** Restores an exact source selection only in its own resource. */
++    public suspend fun resumeReadleSelection(locator: JSONObject): Boolean {
++        val page = currentReflowablePageFragment ?: return false
++        if (page.link?.href?.toString() != locator.optString("href")) return false
++        page.awaitLoaded()
++        if (page !== currentReflowablePageFragment) return false
++        return page.runJavaScriptSuspend(
++            "window.__readleAnchors.resume($locator, ${settings.value.scroll});"
++        ) == "true"
++    }
++
+     // SelectableNavigator
+
+     override suspend fun currentSelection(): Selection? {
+         val fragment = currentReflowablePageFragment ?: return null
+         val json =
+-            fragment.runJavaScriptSuspend("readium.getCurrentSelection();")
++            fragment.runJavaScriptSuspend("window.__readleAnchors.capture();")
+                 .takeIf { it != "null" }
+                 ?.let { tryOrLog { JSONObject(it) } }
+                 ?: return null
+@@ -714,8 +728,16 @@
+         val rect = json.optRectF("rect")
+             ?.run { adjustedToViewport() }
+
++        val resourceLocator = fragment.link?.let { publication.locatorFromLink(it) }
++        val current = currentLocator.value
++        val locator = resourceLocator?.takeUnless { it.href == current.href } ?: current
++        val range = json.optJSONObject("readleRange")
+         return Selection(
+-            locator = currentLocator.value.copy(
++            locator = locator.copy(
++                locations = locator.locations.copy(
++                    otherLocations = if (range == null) locator.locations.otherLocations
++                        else locator.locations.otherLocations + ("readleRange" to range)
++                ),
+                 text = Locator.Text.fromJSON(json.optJSONObject("text"))
+             ),
+             rect = rect
+@@ -840,6 +862,10 @@
+             return this@EpubNavigatorFragment.goToNextResource(jump = jump, animated = animated)
+         }
+
++        override fun onReadlePageTurn(forward: Boolean) {
++            readlePageTurn?.invoke(forward)
++        }
++
+         override val selectionActionModeCallback: ActionMode.Callback?
+             get() = config.selectionActionModeCallback
+
+@@ -867,11 +893,45 @@
+                 ?.let { publication.get(it) }
+     }
+
++    // Preserve Chromium's live selection instead of using JavaScript scrolling,
++    // which the paginated column-selection guard intentionally blocks.
++    public fun readleTurnPage(forward: Boolean, hasSavedTurnSelection: Boolean): Boolean {
++        if (viewModel.isScrollEnabled.value) {
++            // Edge swipes already established the gesture direction. Use the spine
++            // directly instead of asking WebView to scroll while selecting.
++            return if (forward) goToNextResource(jump = true, animated = false)
++                else goToPreviousResource(jump = true, animated = false)
++        }
++        if (hasSavedTurnSelection) {
++            turnPageWithSelection(forward, animated = false, forceNativePager = true)?.let { return it }
++        }
++        return if (forward) goForward(animated = false) else goBackward(animated = false)
++    }
++
++    private fun turnPageWithSelection(
++        forward: Boolean,
++        animated: Boolean,
++        forceNativePager: Boolean = false,
++    ): Boolean? {
++        val webView = currentReflowablePageFragment?.webView ?: return null
++        if (settings.value.scroll || (!forceNativePager && !webView.isSelecting)) return null
++        val rtl = settings.value.readingProgression == ReadingProgression.RTL
++        val step = if (forward != rtl) 1 else -1
++        val index = webView.mCurItem + step
++        if (index !in 0 until webView.numPages) {
++            return if (forward) goToNextResource(jump = false, animated = animated)
++                else goToPreviousResource(jump = false, animated = animated)
++        }
++        webView.setCurrentItem(index, animated)
++        return true
++    }
++
+     override fun goForward(animated: Boolean): Boolean {
+         if (publication.metadata.presentation.layout == EpubLayout.FIXED) {
+             return goToNextResource(jump = false, animated = animated)
+         }
+
++        turnPageWithSelection(forward = true, animated = animated)?.let { return it }
+         val webView = currentReflowablePageFragment?.webView ?: return false
+
+         when (settings.value.readingProgression) {
+@@ -889,6 +949,7 @@
+             return goToPreviousResource(jump = false, animated = animated)
+         }
+
++        turnPageWithSelection(forward = false, animated = animated)?.let { return it }
+         val webView = currentReflowablePageFragment?.webView ?: return false
+
+         when (settings.value.readingProgression) {
+@@ -911,7 +972,17 @@
+             locatorToNextResource()?.let { listener?.onJumpToLocator(it) }
+         }
+
+-        resourcePager.setCurrentItem(resourcePager.currentItem + 1, animated)
++        val index = resourcePager.currentItem + 1
++        resourcePager.setCurrentItem(index, animated)
++
++        if (settings.value.scroll && publication.metadata.presentation.layout != EpubLayout.FIXED) {
++            locatorToResourceAtIndex(index)?.let { locator ->
++                r2PagerAdapter?.loadLocatorAt(index, locator.copy(
++                    locations = locator.locations.copy(progression = 0.0)
++                ))
++            }
++            return true
++        }
+
+         currentReflowablePageFragment?.webView?.let { webView ->
+             if (settings.value.readingProgression == ReadingProgression.RTL) {
+@@ -933,7 +1004,17 @@
+             locatorToPreviousResource()?.let { listener?.onJumpToLocator(it) }
+         }
+
+-        resourcePager.setCurrentItem(resourcePager.currentItem - 1, animated)
++        val index = resourcePager.currentItem - 1
++        resourcePager.setCurrentItem(index, animated)
++
++        if (settings.value.scroll && publication.metadata.presentation.layout != EpubLayout.FIXED) {
++            locatorToResourceAtIndex(index)?.let { locator ->
++                r2PagerAdapter?.loadLocatorAt(index, locator.copy(
++                    locations = locator.locations.copy(progression = 1.0)
++                ))
++            }
++            return true
++        }
+
+         currentReflowablePageFragment?.webView?.let { webView ->
+             if (settings.value.readingProgression == ReadingProgression.RTL) {

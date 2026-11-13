@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   Pressable,
   ScrollView,
   StatusBar,
@@ -11,6 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Book, ImportItem, library, Session } from './src/library';
+import { GeneratedLessonScreen, GeneratedSetup, GenerationProgress } from './src/GeneratedWalkthroughScreen';
+import { isGeneratedCursor } from './src/generatedWalkthrough';
+import type { GeneratedCursor, LearningEdition } from './src/generatedWalkthrough';
+import {WalkthroughLesson, WalkthroughSetup} from './src/WalkthroughScreen';
+import {identityPaperTitle, identityPaperVersion, isWalkthroughCursor} from './src/walkthrough';
+import type {WalkthroughCursor} from './src/walkthrough';
 
 function Action({
   label,
@@ -58,7 +65,7 @@ function SessionRow({
         {showBook && session.bookTitle && (
           <Text style={styles.meta}>{session.bookTitle}</Text>
         )}
-        <Text style={styles.body}>{session.location} · Read</Text>
+        <Text style={styles.body}>{session.location} · {session.mode === 'learn' ? 'Learn' : 'Read'}</Text>
         <Text style={styles.meta}>
           {new Date(session.updatedAt).toLocaleString()}
         </Text>
@@ -74,8 +81,31 @@ function LibraryScreen() {
   const [recent, setRecent] = useState<Session[]>([]);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [tab, setTab] = useState<'library' | 'continue'>('library');
+  const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const actionInProgress = useRef(false);
   const [error, setError] = useState('');
+  const [sampleItems, setSampleItems] = useState<ImportItem[]>([]);
+  const [planning, setPlanning] = useState<'generated' | 'sample' | null>(null);
+  const [generated, setGenerated] = useState<{
+    id: string; cursor: GeneratedCursor; edition: LearningEdition | null; start: boolean;
+  } | null>(null);
+  const [walkthrough, setWalkthrough] = useState<{id: string; cursor: WalkthroughCursor} | null>(null);
+  useEffect(() => {
+    if (!planning && !walkthrough && !generated) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!busy) {
+        setPlanning(null);
+        setWalkthrough(null);
+        setGenerated(null);
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [busy, planning, walkthrough, generated]);
   const refresh = useCallback(async () => {
     if (!library) {
       return;
@@ -101,34 +131,126 @@ function LibraryScreen() {
     });
     return () => subscription.remove();
   }, [refresh]);
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, refreshLibrary = true) {
+    if (actionInProgress.current) {
+      return;
+    }
+    actionInProgress.current = true;
     setError('');
     setBusy(true);
     try {
       await action();
-      await refresh();
+      if (refreshLibrary) {
+        await refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {
+      actionInProgress.current = false;
       setBusy(false);
     }
   }
   const open = (session: Session) =>
-    run(() => library!.openSession(session.id));
+    run(async () => {
+      if (session.mode === 'learn') {
+        const cursor = await library!.learningCursor(session.id);
+        if (isGeneratedCursor(cursor)) {
+          const edition = await library!.learningEdition(session.id);
+          setGenerated({id: session.id, cursor, edition, start: false});
+          return;
+        }
+        if (!isWalkthroughCursor(cursor)) {
+          throw new Error('This saved walkthrough could not be restored.');
+        }
+        setWalkthrough({id: session.id, cursor});
+      } else {
+        await library!.openSession(session.id);
+      }
+    });
   const create = () =>
     run(async () => {
       const session = await library!.createSession(selected!.id);
       await library!.openSession(session.id);
     });
+  const openBook = (book: Book) => {
+    setSessions([]);
+    setSelected(book);
+  };
+  const convertPdf = (pdf: Book) =>
+    run(async () => {
+      setConverting(true);
+      try {
+        const epub = await library!.convertToEpub(pdf.id);
+        const nextBooks = await library!.books();
+        setBooks(nextBooks);
+        openBook(epub);
+      } finally {
+        setConverting(false);
+      }
+    }, false);
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
       <View style={styles.header}>
         <Text style={styles.brand}>readle</Text>
-        <Text style={styles.edition}>READER SPIKE · 0.1</Text>
+        {planning || walkthrough || generated ? (
+          <Action label="Back to sessions" secondary onPress={() => {
+            if (!busy) {
+              setPlanning(null);
+              setWalkthrough(null);
+              setGenerated(null);
+            }
+          }} />
+        ) : (
+          <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
+        )}
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {selected ? (
+      <ScrollView keyboardShouldPersistTaps="handled" key={generated ? `${generated.id}-${generated.cursor.lesson}-${generated.cursor.pass}` : walkthrough?.cursor.lesson ?? (planning ? 'planning' : 'library')}
+        contentContainerStyle={styles.content}>
+        {generated ? (
+          generated.edition ? (
+            <GeneratedLessonScreen cursor={generated.cursor} edition={generated.edition} busy={busy}
+              onChange={cursor => run(async () => {
+                await library!.saveLearningCursor(generated.id, cursor);
+                setGenerated({...generated, cursor});
+              }, false)}
+              onSource={page => run(() => library!.openWalkthroughSource(generated.id, page), false)} />
+          ) : (
+            <GenerationProgress sessionId={generated.id} start={generated.start}
+              onReady={edition => setGenerated(current => current?.id === generated.id ? {...current, edition, start: false} : current)} />
+          )
+        ) : walkthrough ? (
+          <WalkthroughLesson cursor={walkthrough.cursor} busy={busy}
+            onChange={cursor => run(async () => {
+              await library!.saveLearningCursor(walkthrough.id, cursor);
+              setWalkthrough({...walkthrough, cursor});
+            }, false)}
+            onSource={page => run(() => library!.openWalkthroughSource(walkthrough.id, page), false)} />
+        ) : planning === 'generated' && selected ? (
+          <GeneratedSetup title={selected.sourceVersion === identityPaperVersion ? identityPaperTitle : selected.title}
+            busy={busy} onStart={profile => run(async () => {
+              const session = await library!.createGeneratedWalkthrough(selected.id, profile);
+              const cursor: GeneratedCursor = {version: 2, profile, lesson: 0, pass: 1, drafts: {}, submissions: {}};
+              setGenerated({id: session.id, cursor, edition: null, start: true});
+              setPlanning(null);
+            })} />
+        ) : planning === 'sample' && selected ? (
+          <WalkthroughSetup busy={busy} onStart={cursor => run(async () => {
+            const session = await library!.createWalkthrough(selected.id, cursor);
+            setWalkthrough({id: session.id, cursor});
+            setPlanning(null);
+          })} />
+        ) : about ? (
+          <>
+            <Text style={styles.heading}>About Readle</Text>
+            <Text style={styles.body}>
+              {library?.versionName
+                ? `Version ${library.versionName} · Build ${library.buildNumber}`
+                : 'Version unavailable'}
+            </Text>
+            <Text style={styles.body}>Read and keep notes in your own book sessions.</Text>
+          </>
+        ) : selected ? (
           <>
             <Pressable
               accessibilityRole="button"
@@ -138,12 +260,19 @@ function LibraryScreen() {
               <Text style={styles.link}>‹ Library</Text>
             </Pressable>
             <Text style={styles.eyebrow}>
-              {selected.format.toUpperCase()} · STORED ON THIS DEVICE
+              {selected.format === 'pdf' ? 'PDF SOURCE' : 'EPUB READER'} · STORED ON THIS DEVICE
             </Text>
-            <Text style={styles.heading}>{selected.title}</Text>
+            <Text style={styles.heading}>{selected.sourceVersion === identityPaperVersion ? identityPaperTitle : selected.title}</Text>
             <Text style={styles.body}>
-              Pick up a session or begin somewhere new.
+              {selected.sourcePdfId
+                ? 'Converted text. Use Original page in the reader for figures, tables, and equations.'
+                : 'Resume your work, or start with a blank workspace.'}
             </Text>
+            {converting && (
+              <Text style={styles.body} accessibilityLiveRegion="polite">
+                Converting PDF to EPUB on this device…
+              </Text>
+            )}
             {!busy && (
               <View style={styles.actions}>
                 {sessions.length > 0 && (
@@ -152,12 +281,37 @@ function LibraryScreen() {
                     onPress={() => open(sessions[0])}
                   />
                 )}
+                {selected.format === 'pdf' && (
+                  <>
+                    <Action
+                      label={selected.epubId ? 'View EPUB edition' : 'Convert to EPUB'}
+                      onPress={() => convertPdf(selected)}
+                      secondary={sessions.length > 0}
+                    />
+                    <Action label="Build learning edition" onPress={() => setPlanning('generated')} secondary />
+                  </>
+                )}
+                {selected.sourcePdfId && (
+                  <Action
+                    label="View original PDF"
+                    secondary
+                    onPress={() => {
+                      const pdf = books.find(book => book.id === selected.sourcePdfId);
+                      if (pdf) {
+                        openBook(pdf);
+                      }
+                    }}
+                  />
+                )}
+                {selected.sourceVersion === identityPaperVersion && (
+                  <Action label="Plan a walkthrough" onPress={() => setPlanning('sample')} secondary />
+                )}
                 <Action
                   label={
-                    sessions.length ? 'Start new session' : 'Start reading'
+                    selected.sourceVersion === identityPaperVersion ? 'Read original' : sessions.length ? 'Start new session' : 'Start reading'
                   }
                   onPress={create}
-                  secondary={sessions.length > 0}
+                  secondary={sessions.length > 0 || selected.sourceVersion === identityPaperVersion}
                 />
               </View>
             )}
@@ -216,8 +370,38 @@ function LibraryScreen() {
                     <Action
                       label="Add sample books"
                       secondary
-                      onPress={() => run(() => library!.importFixtures())}
+                      onPress={() => run(async () => {
+                        setSampleItems([]);
+                        setSampleItems(await library!.importFixtures());
+                      })}
                     />
+                    {sampleItems.length > 0 && (
+                      <View accessibilityLiveRegion="polite" style={styles.sampleResult}>
+                        {sampleItems.map(item => {
+                          const format = item.name.endsWith('.epub') ? 'EPUB' : 'PDF';
+                          const sample = books.find(book => book.id === item.bookId);
+                          return (
+                            <View key={item.id}>
+                              <Text style={item.status === 'failed' ? styles.error : styles.body}>
+                                {`Sample ${format}: ${item.status === 'ready' ? 'added to your library' : item.status === 'duplicate' ? 'already in your library' : item.error || 'could not be added'}`}
+                              </Text>
+                              {sample && (
+                                <Pressable
+                                  accessibilityRole="button"
+                                  style={styles.back}
+                                  onPress={() => {
+                                    setSessions([]);
+                                    setSelected(sample);
+                                  }}
+                                >
+                                  <Text style={styles.link}>{`View sample ${format}`}</Text>
+                                </Pressable>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 )}
                 {books.length === 0 && (
@@ -226,7 +410,7 @@ function LibraryScreen() {
                       Make room for a good idea.
                     </Text>
                     <Text style={styles.body}>
-                      Import a PDF or EPUB, or try the original Readle sample.
+                      Import an EPUB to read, or convert an imported PDF to EPUB.
                       Everything in this build stays on your device.
                     </Text>
                   </View>
@@ -235,10 +419,7 @@ function LibraryScreen() {
                   <Pressable
                     accessibilityRole="button"
                     key={book.id}
-                    onPress={() => {
-                      setSessions([]);
-                      setSelected(book);
-                    }}
+                    onPress={() => openBook(book)}
                     style={styles.bookRow}
                   >
                     <View
@@ -253,9 +434,9 @@ function LibraryScreen() {
                       </Text>
                     </View>
                     <View style={styles.grow}>
-                      <Text style={styles.rowTitle}>{book.title}</Text>
+                      <Text style={styles.rowTitle}>{book.sourceVersion === identityPaperVersion ? identityPaperTitle : book.title}</Text>
                       <Text style={styles.meta}>
-                        {book.format.toUpperCase()} · Available offline
+                        {book.format === 'pdf' ? 'PDF · Source/reference' : 'EPUB · Reader'} · Available offline
                       </Text>
                       <Text style={styles.link}>View sessions →</Text>
                     </View>
@@ -321,9 +502,11 @@ function LibraryScreen() {
             {error}
           </Text>
         )}
-        <Text style={styles.footer}>
-          Read and annotate offline. Learning and AI arrive in later milestones.
-        </Text>
+        {!planning && !walkthrough && !generated && (
+          <Text style={styles.footer}>
+            Each new session starts without notes or highlights from other sessions.
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -376,6 +559,7 @@ const styles = StyleSheet.create({
   },
   body: { fontSize: 15, lineHeight: 23, color: '#626A60' },
   actions: { gap: 10, marginVertical: 24 },
+  sampleResult: { padding: 12, backgroundColor: '#E9EEE5', borderRadius: 8, gap: 8 },
   button: {
     minHeight: 48,
     backgroundColor: '#355742',

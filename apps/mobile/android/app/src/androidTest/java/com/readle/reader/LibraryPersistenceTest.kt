@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
+import java.util.zip.ZipFile
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
@@ -47,7 +48,7 @@ class LibraryPersistenceTest {
     }
 
     @Test
-    fun twoSessionsSurviveReopenWithIndependentWorkspaceAndSharedAnnotations() {
+    fun twoSessionsSurviveReopenWithIndependentWorkspaceAndAnnotations() {
         val first = db.createSession(bookId).getString("id")
         val second = db.createSession(bookId).getString("id")
         db.mutateSession(first) {
@@ -56,7 +57,7 @@ class LibraryPersistenceTest {
         }
         db.mutateSession(second) { it.put("readingLocator", JSONObject().put("pageIndex", 2)) }
         db.annotate(
-            bookId,
+            first,
             JSONObject().put("pageIndex", 1),
             "The weighted average",
             "Check the assumption",
@@ -81,8 +82,12 @@ class LibraryPersistenceTest {
                 .getJSONObject("assistant")
                 .getString("draft"),
         )
-        assertEquals(1, db.annotations(bookId).length())
-        assertEquals(2, db.sessions(bookId).length())
+        assertEquals(1, db.annotations(first).length())
+        assertEquals(0, db.annotations(second).length())
+        val blank = db.createSession(bookId).getString("id")
+        assertEquals(0, db.annotations(blank).length())
+        assertTrue(JSONObject(db.session(blank).getString("state")).isNull("selection"))
+        assertEquals(3, db.sessions(bookId).length())
     }
 
     @Test
@@ -126,6 +131,79 @@ class LibraryPersistenceTest {
         assertEquals(1, db.sessions(otherId).length())
         assertEquals(otherSession, db.sessions(otherId).getJSONObject(0).getString("id"))
         assertNotEquals(bookId, db.sessions(otherId).getJSONObject(0).getString("bookId"))
+    }
+
+    @Test
+    fun convertedEpubKeepsPageMappingAndPdfSessionThroughRepair() {
+        val importer = BookImporter(context, db)
+        val source = File.createTempFile("pdf-conversion-test-", ".pdf", context.cacheDir)
+        try {
+            context.assets.open("fixtures/readle-sample.pdf").use { input ->
+                source.outputStream().use { input.copyTo(it) }
+            }
+            db.writableDatabase.update(
+                "books",
+                ContentValues().apply { put("path", source.absolutePath) },
+                "id = ?",
+                arrayOf(bookId),
+            )
+            val pdfSession = db.createSession(bookId).getString("id")
+            db.mutateSession(pdfSession) { it.put("readingLocator", JSONObject().put("pageIndex", 1)) }
+            val pdfBefore = db.session(pdfSession).toString()
+            val original = source.readBytes()
+            val edition = importer.convertToEpub(bookId)
+            val epubId = edition.getString("id")
+            val epub = File(edition.getString("path"))
+            assertEquals("epub", edition.getString("format"))
+            assertEquals(bookId, db.originalPdf(epubId)?.getString("id"))
+            ZipFile(epub).use { archive ->
+                val page = archive.getEntry("EPUB/pdf-page-2.xhtml")
+                assertNotNull(page)
+                assertEquals(1, PdfEpubConverter.pageIndex(page.name))
+                val markup = archive.getInputStream(page).bufferedReader().use { it.readText() }
+                assertTrue(markup.contains("PDF page 2"))
+                assertTrue(markup.contains("The weighted average"))
+                assertTrue(markup.contains("pagebreak"))
+                assertNotNull(archive.getEntry("EPUB/pdf-page-3.xhtml"))
+            }
+            assertEquals(0, db.sessions(epubId).length())
+            val epubSession = db.createSession(epubId).getString("id")
+            assertEquals(epubId, importer.convertToEpub(bookId).getString("id"))
+            assertTrue(epub.delete())
+            assertEquals(epubId, importer.convertToEpub(bookId).getString("id"))
+            assertTrue(epub.isFile)
+            assertEquals(epubSession, db.sessions(epubId).getJSONObject(0).getString("id"))
+            assertEquals(pdfBefore, db.session(pdfSession).toString())
+            assertArrayEquals(original, source.readBytes())
+            epub.delete()
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
+    fun pdfWithoutTextDoesNotCreateAnEpubEntry() {
+        val source = File.createTempFile("pdf-no-text-", ".pdf", context.cacheDir)
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { document ->
+                document.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+                document.save(source)
+            }
+            db.writableDatabase.update(
+                "books", ContentValues().apply { put("path", source.absolutePath) },
+                "id = ?", arrayOf(bookId),
+            )
+            try {
+                BookImporter(context, db).convertToEpub(bookId)
+                fail("Conversion accepted a PDF without selectable text")
+            } catch (error: IllegalArgumentException) {
+                assertTrue(error.message.orEmpty().contains("OCR"))
+            }
+            assertNull(db.convertedEpub(bookId))
+            assertEquals(1, db.books().length())
+        } finally {
+            source.delete()
+        }
     }
 
     @Test
@@ -210,18 +288,29 @@ class LibraryPersistenceTest {
 
     @Test
     fun annotationEditPreservesIdentityAndRejectsStaleOrWrongBookWrites() {
+        val sessionId = db.createSession(bookId).getString("id")
+        val blank = db.createSession(bookId).getString("id")
         val anchor = JSONObject().put("pageIndex", 1).put("quote", "The weighted average")
-        val id = db.annotate(bookId, anchor, "The weighted average", "Original note")
-        val before = db.annotation(bookId, id)!!
-        db.updateAnnotationNote(bookId, id, "Original note", "Revised note")
-        val after = db.annotation(bookId, id)!!
+        val id = db.annotate(sessionId, anchor, "The weighted average", "Original note")
+        val before = db.annotation(sessionId, id)!!
+        db.updateAnnotationNote(sessionId, id, "Original note", "Revised note")
+        val after = db.annotation(sessionId, id)!!
         assertEquals("Revised note", after.getString("note"))
         for (field in listOf("id", "sourceVersion", "locator", "quote", "createdAt")) {
             assertEquals(before.get(field), after.get(field))
         }
         try {
-            db.updateAnnotationNote(bookId, id, "Original note", "Stale text")
+            db.updateAnnotationNote(sessionId, id, "Original note", "Stale text")
             fail("Stale edit accepted")
+        } catch (_: IllegalStateException) {}
+        assertNull(db.annotation(blank, id))
+        try {
+            db.updateAnnotationNote(blank, id, "Revised note", "Wrong session")
+            fail("Cross-session edit accepted")
+        } catch (_: IllegalStateException) {}
+        try {
+            db.deleteAnnotation(blank, id)
+            fail("Cross-session delete accepted")
         } catch (_: IllegalStateException) {}
         val otherId = java.util.UUID.randomUUID().toString()
         db.writableDatabase.insertOrThrow(
@@ -235,41 +324,51 @@ class LibraryPersistenceTest {
                 put("sourceVersion", otherId)
             },
         )
-        assertNull(db.annotation(otherId, id))
+        val otherSession = db.createSession(otherId).getString("id")
+        assertNull(db.annotation(otherSession, id))
         try {
-            db.updateAnnotationNote(otherId, id, "Revised note", "Wrong owner")
+            db.updateAnnotationNote(otherSession, id, "Revised note", "Wrong owner")
             fail("Cross-book edit accepted")
         } catch (_: IllegalStateException) {}
         try {
-            db.deleteAnnotation(otherId, id)
+            db.deleteAnnotation(otherSession, id)
             fail("Cross-book deletion accepted")
         } catch (_: IllegalStateException) {}
         db.close()
         db = LibraryDatabase(context, "readle-test.db")
-        assertEquals("Revised note", db.annotation(bookId, id)!!.getString("note"))
-        assertEquals(1, db.annotations(bookId).length())
+        assertEquals("Revised note", db.annotation(sessionId, id)!!.getString("note"))
+        assertEquals(1, db.annotations(sessionId).length())
     }
 
     @Test
-    fun deletingHighlightClearsOnlyMatchingSavedSelectionsAcrossSessions() {
+    fun deletingHighlightAffectsOnlyItsOwningSession() {
         val anchor = JSONObject().put("pageIndex", 1)
-        val id = db.annotate(bookId, anchor, "The weighted average", "Note")
-        val otherId = db.annotate(bookId, JSONObject().put("pageIndex", 2), "Independent", "Keep")
         val first = db.createSession(bookId).getString("id")
         val second = db.createSession(bookId).getString("id")
+        val id = db.annotate(first, anchor, "The weighted average", "Note")
+        val otherId = db.annotate(second, anchor, "The weighted average", "Independent note")
         for (sessionId in listOf(first, second)) db.mutateSession(sessionId) {
             it.put("selection", JSONObject().put("locator", anchor))
             it.put("readingLocator", JSONObject().put("pageIndex", 2))
         }
         val previousTimestamp = db.session(second).getLong("updatedAt")
-        db.deleteAnnotation(bookId, id)
-        assertNull(db.annotation(bookId, id))
-        assertNotNull(db.annotation(bookId, otherId))
-        for (sessionId in listOf(first, second)) {
-            val state = JSONObject(db.session(sessionId).getString("state"))
-            assertTrue(state.isNull("selection"))
-            assertEquals(2, state.getJSONObject("readingLocator").getInt("pageIndex"))
-        }
+        db.deleteAnnotation(first, id)
+        assertNull(db.annotation(first, id))
+        assertNotNull(db.annotation(second, otherId))
+        assertTrue(JSONObject(db.session(first).getString("state")).isNull("selection"))
+        assertEquals(
+            anchor.toString(),
+            JSONObject(db.session(second).getString("state"))
+                .getJSONObject("selection")
+                .getJSONObject("locator")
+                .toString(),
+        )
+        for (sessionId in listOf(first, second)) assertEquals(
+            2,
+            JSONObject(db.session(sessionId).getString("state"))
+                .getJSONObject("readingLocator")
+                .getInt("pageIndex"),
+        )
         assertEquals(previousTimestamp, db.session(second).getLong("updatedAt"))
     }
 }

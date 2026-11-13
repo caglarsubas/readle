@@ -44,6 +44,7 @@ class PdfPageView(
     context: Context,
     private val onSelection: (JSONObject, String) -> Unit,
     private val onAnnotationTap: (List<String>) -> Unit,
+    private val onClearSelection: () -> Unit,
 ) : View(context) {
     private var bitmap: Bitmap? = null
     private var glyphs: List<Glyph> = emptyList()
@@ -54,7 +55,6 @@ class PdfPageView(
     private var last = -1
     private var draggingStart = false
     private var dragging = false
-    var extendFromPageStart = false
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG)
     private var highlights = listOf<PdfHighlight>()
     private val detector =
@@ -63,10 +63,14 @@ class PdfPageView(
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent) = true
 
-                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    if (first >= 0 && !selectionContains(e.x, e.y)) {
+                        clearSelection()
+                        onClearSelection()
+                    }
                     val ids = highlightedObjectsAt(e.x, e.y)
-                    if (ids.isEmpty()) return false
-                    onAnnotationTap(ids)
+                    if (ids.isNotEmpty()) onAnnotationTap(ids)
+                    performClick()
                     return true
                 }
 
@@ -129,6 +133,8 @@ class PdfPageView(
         super.onDraw(canvas)
         canvas.drawColor(Color.WHITE)
         val image = bitmap ?: return
+        ink.alpha = 255
+        ink.isFilterBitmap = true
         canvas.drawBitmap(image, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), ink)
         val sx = width / pageWidth
         val sy = height / pageHeight
@@ -246,7 +252,7 @@ class PdfPageView(
             !b.text.isBlank()
 
     private fun report() {
-        val start = if (extendFromPageStart) 0 else min(first, last)
+        val start = min(first, last)
         val end = max(first, last)
         val selected = glyphs.subList(start, end + 1)
         val text = StringBuilder()
@@ -272,10 +278,18 @@ class PdfPageView(
         invalidate()
     }
 
-    fun selectToEnd() {
-        if (first < 0 || glyphs.isEmpty()) return
-        last = glyphs.lastIndex
-        report()
+    private fun selectionContains(x: Float, y: Float): Boolean {
+        if (first < 0 || last < 0) return false
+        val px = x / width.coerceAtLeast(1) * pageWidth
+        val py = y / height.coerceAtLeast(1) * pageHeight
+        return (min(first, last)..max(first, last)).any { glyphs[it].bounds.contains(px, py) }
+    }
+
+    fun clearSelection() {
+        first = -1
+        last = -1
+        dragging = false
+        invalidate()
     }
 
     fun release() {

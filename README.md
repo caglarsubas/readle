@@ -1,8 +1,8 @@
 # Readle
 
-An offline reader with independent, resumable workspaces for each book. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
+Readle helps learners follow a recommended walkthrough through a book's ideas, with independent, resumable sessions and direct access to the original source. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
 
-The current deliverable is an Android reader spike. It opens original PDF pages and EPUBs, imports multiple files independently, persists sessions in SQLite, and stores source-linked highlights and notes. The React Native iOS shell is present. The native iOS reader, AI, guided learning, backend, and sync milestones are pending. Phase A requires physical iOS and Android evidence before acceptance.
+Android Build 18 generates a saved three-pass learning edition from a text PDF and learner profile using the local Mac service. Follow the setup and acceptance steps in the [Build 18 walkthrough checklist](docs/uat/BUILD_18_WALKTHROUGH.md).
 
 ## Run and build
 
@@ -14,17 +14,25 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 12
+./scripts/build-android.sh 18
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-11.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-19.apk`.
 
 ## Install the current Android UAT build
 
-Build 11 is the current private handoff. Build 10 passed the product owner’s Android UAT on a Samsung Z Fold7 running Android 17. With one authorized Android phone connected by USB, run `./scripts/install-android-uat.sh 11` from the repository root. The installer verifies the APK checksum, retains existing app data, copies the import-test fixtures and opens Readle. See [the phone setup and UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a build number higher than 11 for the next update.
+Install Build 19 using **Update**. Open an imported PDF in the Library and tap **Convert to EPUB** to make an offline reading edition. **Build learning edition** opens the separate personalized walkthrough setup and uses the Mac generator. [Build 19 checklist](docs/uat/BUILD_19_PDF_TO_EPUB.md) · [Walkthrough checklist](docs/uat/BUILD_18_WALKTHROUGH.md).
 
 ## Try it
 
-Open **Add sample books**, select either publication, and start reading. Navigate to a later page or chapter. Return to Library and start a second session. Force-stop and reopen, select that book, and choose either session. In PDF, long press text and drag a selection endpoint, then use **Selection** to highlight, note, copy, look up, or explicitly search Google. Use **Extend to next page** for a two-page selection. EPUB uses native Readium selection handles and its contextual Highlight/Note actions. **Notes** opens shared annotations and JSON export. Tap a saved highlight in either format to edit its note, copy/share the quote, open its source or delete the object. PDF supports pinch and double-tap zoom, with saved horizontal and vertical offsets.
+Open **Add sample books**, select an EPUB, and start reading. Each new session starts at the beginning with no copied notes, highlights, selection or assistant state. Add a note, return to Library and create another session for the same book. It starts blank. Resume the first session to return to its own work.
 
-See `docs/uat/ANDROID_UAT.md` for acceptance instructions and `docs/IMPLEMENTATION_PLAN.md` for the remaining milestones. The sample books are self-authored CC0 fixtures. Regenerate them with Python and ReportLab using `python scripts/generate_fixtures.py`.
+New reflowable EPUB sessions use vertical scrolling. In **Continuous scroll**, swipe up or down, then swipe again at a chapter edge to continue. **Pages** uses horizontal turns. The layout is saved per session. Drag an end/start handle to the right/left text edge to extend the selection into the next/previous page of the current chapter. An ordinary page turn keeps the passage available from **Selection**. Open or edit notes and highlights in the reader panel. **Find** searches EPUB text offline and marks the chosen result in the book.
+
+PDF is labelled **Source/reference** and always fits the current window width. It retains page/vertical position and its session’s existing annotations. A short tap outside a temporary selection clears it. **Open original** opens a local PDF viewer of your choice for advanced PDF controls. PDF reflow and cross-page authoring are deferred. Existing multi-page annotations remain readable.
+
+On upgrading from build 10/11, formerly shared notes are preserved as independent copies in already-existing sessions because the old database did not record their originating session. New sessions created after the upgrade remain empty. See [ADR 022](docs/adr/022-session-annotations.md) and [ADR 023](docs/adr/023-epub-first.md).
+
+See [the Android checklist](docs/uat/ANDROID_UAT.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md). The sample books are self-authored CC0 fixtures. Regenerate them with Python and ReportLab using `python scripts/generate_fixtures.py`.
+
+The Android build materializes a checksum-pinned Readium navigator source archive and applies the small patch described in [ADR 024](docs/adr/024-epub-selection-gestures.md). The initial clean build requires network access; the source archive is cached for subsequent builds.

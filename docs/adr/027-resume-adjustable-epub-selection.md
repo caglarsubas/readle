@@ -1,0 +1,11 @@
+# 027 — Restore adjustable EPUB selections after a page turn
+
+Accepted 2026-11-12 for Android Build 16. Build 15 owner UAT found that the saved quote could remain pale blue after WebView lost its adjustable range. An ordinary chapter round trip reproduced the failure in the foldable emulator. This refines [ADR 026](026-live-selection-page-turns.md).
+
+Keep the live Chromium selection when it survives. Before a turn, retain its exact source locator independently of the viewport. A return can happen before Readium emits a debounced location, so page navigation with a pending selection checks the source immediately after the native turn and when the reading location settles. The snapshot remains available while the source is offscreen or WebView still owns the range.
+
+When WebView drops the range, restore only inside the matching EPUB resource, when the exact endpoint paths and quote resolve and the passage is visible. Clear any collapsed caret before adding the range. Render Readle's draggable grips only for this restored range, outside the publication body so the text paths stay stable. Position them in document coordinates for Readium's paginated columns. Grip drags move just one endpoint, can extend within the resource at a held edge, and stop on release or cancellation. They do not initiate a separate page swipe.
+
+In Continuous scroll, keep selected touch streams in the active WebView. A vertical swipe begun at an edge turns through the resource pager directly, preserving the captured passage. The start of the next chapter and end of the previous chapter remain the landing points. The range never spans different EPUB resources. Saved-selection marker IDs include the resource, so selecting a passage in another chapter removes the old marker instead of updating it only in the new chapter. Explicit Clear selection, a new captured range, layout change, or a separate source jump supersedes the old turn snapshot. The database schema, source edition and PDF behavior are unchanged.
+
+Test real long presses, both resource directions, quick turn-and-return, loss of the native range while away, touch adjustment, an unchanged opposite endpoint and stop-on-release. The deliberate WebView collapse case isolates recovery; a screenshot or a JS-only range is insufficient to establish gesture acceptance.

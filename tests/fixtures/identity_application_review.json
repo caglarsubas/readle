@@ -1,0 +1,31 @@
+{
+  "source_version": "b019c9420565afe6a3f81fcd8e9b3375f546003cecab93ecfa25d965b2f68bb2",
+  "items": [
+    {
+      "lesson_title": "Enforcing Least Privilege in Recursive Delegation via Scope Attenuation",
+      "passage_ids": ["p19-10"],
+      "stem": "A distribution agent can read inventory, create shipping labels and release payments. It delegates label creation to a contractor agent. The issuer is offline, but the token supports offline attenuation and the contractor can reach the label API. Which credential should the distribution agent give the contractor?",
+      "options": {
+        "a": "The original token with an instruction to call only the label API.",
+        "b": "A new token from the contractor that can create labels and read inventory.",
+        "c": "A derived token whose effective permission only allows creating labels.",
+        "d": "A copy of the original token with a shorter lifetime and all three permissions."
+      },
+      "answer": "c",
+      "rationale": "The contractor needs only label creation. Offline attenuation can restrict the effective permissions of a derived credential without contacting the issuer. An instruction or a shorter lifetime leaves the extra permissions usable."
+    },
+    {
+      "lesson_title": "Securing Recursive Chains through Robust De-provisioning",
+      "passage_ids": ["p14-3", "p20-6"],
+      "stem": "A vendor-onboarding agent is compromised. Its access token has already been revoked. Two partner services still recognize its registered identity, and a helper still has a delegated grant. The incident lead wants to prevent new access after the current credentials expire. What should the team do next?",
+      "options": {
+        "a": "De-provision the agent across both partners and remove the helper’s derived grant.",
+        "b": "Wait for the old access token to expire and leave the registrations in place.",
+        "c": "Replace the agent’s token while keeping the same partner registrations and helper grant.",
+        "d": "Revoke the helper’s current token and retain the agent’s partner registrations."
+      },
+      "answer": "a",
+      "rationale": "Revocation addressed the current token. The remaining partner registrations can still confer new access. De-provisioning removes the compromised identity and its associated access across the partners, including the surviving grant derived from it."
+    }
+  ]
+}

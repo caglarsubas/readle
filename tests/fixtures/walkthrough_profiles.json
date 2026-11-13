@@ -1,0 +1,12 @@
+{
+  "beginner": {
+    "background": "Product manager new to identity and OAuth. Understands that agents call tools but has never designed an authorization flow.",
+    "goal": "Explain to my team why an agent needs a distinct identity, what consent and scope mean, and when to ask a person before an action.",
+    "preference": "Plain language first. Use familiar workplace examples, then show enough technical detail to discuss the design with engineers."
+  },
+  "engineer": {
+    "background": "Staff IAM engineer who already works with OAuth, identity providers, service identities and policy enforcement.",
+    "goal": "Design and review a cross-domain multi-agent workflow with recursive sub-agent delegation that keeps working after logout but preserves least privilege, revocation and attributable audit.",
+    "preference": "Start with a concrete design problem and focus on decision logic, trust boundaries and negative tests."
+  }
+}

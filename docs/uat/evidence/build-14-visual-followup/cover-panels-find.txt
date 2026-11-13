@@ -1,0 +1,70 @@
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+com.readle.reader.HighlightInteractionTest:
+INSTRUMENTATION_STATUS: test=epubFindShowsNoMatchesThenOpensTheMatchingChapterAndQuote
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: stream=Readle visual checkpoint: find-no-matches
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=Readle visual checkpoint: find-chapter-two
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=epubFindShowsNoMatchesThenOpensTheMatchingChapterAndQuote
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=readerNotesEditAndBackRestoreSamePassage
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: stream=Readle visual checkpoint: notes-saved
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=Readle visual checkpoint: notes-back-closed
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=com.readle.reader.HighlightInteractionTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=2
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1038)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:978)
+	at com.readle.reader.HighlightInteractionTest.readerNotesEditAndBackRestoreSamePassage(HighlightInteractionTest.kt:685)
+
+INSTRUMENTATION_STATUS: stream=
+Error in readerNotesEditAndBackRestoreSamePassage(com.readle.reader.HighlightInteractionTest):
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1038)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:978)
+	at com.readle.reader.HighlightInteractionTest.readerNotesEditAndBackRestoreSamePassage(HighlightInteractionTest.kt:685)
+
+INSTRUMENTATION_STATUS: test=readerNotesEditAndBackRestoreSamePassage
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 102.373
+There was 1 failure:
+1) readerNotesEditAndBackRestoreSamePassage(com.readle.reader.HighlightInteractionTest)
+java.lang.AssertionError: Reader condition did not become true
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.readle.reader.HighlightInteractionTest.waitUntil(HighlightInteractionTest.kt:1038)
+	at com.readle.reader.HighlightInteractionTest.click(HighlightInteractionTest.kt:978)
+	at com.readle.reader.HighlightInteractionTest.readerNotesEditAndBackRestoreSamePassage(HighlightInteractionTest.kt:685)
+
+FAILURES!!!
+Tests run: 2,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1
