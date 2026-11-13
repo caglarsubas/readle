@@ -77,7 +77,7 @@ class AnnotationMigrationTest {
     fun upgradePreservesExistingWorkAndNewSessionsAreBlank() {
         versionOne(true)
         val db = LibraryDatabase(context, name).also { upgraded = it }
-        assertEquals(2, db.writableDatabase.version)
+        assertEquals(3, db.writableDatabase.version)
         for ((index, id) in listOf("one", "two").withIndex()) {
             val row = db.session(id)
             assertEquals(7, row.getInt("revision"))

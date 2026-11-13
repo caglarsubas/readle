@@ -58,11 +58,12 @@ class LibraryModule(private val context: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun books(promise: Promise) =
+    fun books(promise: Promise) = async(promise) { database.books() }
+
+    @ReactMethod
+    fun convertToEpub(bookId: String, promise: Promise) =
         async(promise) {
-            database.query(
-                "SELECT * FROM books ORDER BY CASE WHEN format = 'epub' THEN 0 ELSE 1 END, title"
-            )
+            importer.convertToEpub(bookId).put("sourcePdfId", bookId)
         }
 
     @ReactMethod

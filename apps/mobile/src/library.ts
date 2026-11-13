@@ -11,6 +11,8 @@ export type Book = {
   title: string;
   format: string;
   sourceVersion: string;
+  epubId?: string | null;
+  sourcePdfId?: string | null;
 };
 export type Session = {
   bookTitle?: string;
@@ -36,6 +38,7 @@ interface LibraryBridge {
   sessions(bookId: string): Promise<Session[]>;
   recentSessions(): Promise<Session[]>;
   importBooks(): Promise<ImportItem[]>;
+  convertToEpub(bookId: string): Promise<Book>;
   importFixtures(): Promise<ImportItem[]>;
   importItems(): Promise<ImportItem[]>;
   retryImport(itemId: string): Promise<ImportItem[]>;

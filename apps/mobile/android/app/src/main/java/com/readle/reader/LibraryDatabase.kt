@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 /** All content in this spike belongs to the single device-local profile. */
 class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
-    SQLiteOpenHelper(context, databaseName, null, 2) {
+    SQLiteOpenHelper(context, databaseName, null, 3) {
     override fun onConfigure(db: SQLiteDatabase) {
         db.setForeignKeyConstraintsEnabled(true)
     }
@@ -24,8 +24,15 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
         )
         db.execSQL("CREATE INDEX sessions_book ON sessions(bookId, updatedAt DESC)")
         createAnnotations(db)
+        createPdfEditions(db)
         db.execSQL(
             "CREATE TABLE imports (id TEXT PRIMARY KEY, uri TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL, error TEXT NOT NULL DEFAULT '', bookId TEXT NOT NULL DEFAULT '')"
+        )
+    }
+
+    private fun createPdfEditions(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE pdf_epub_editions (pdfId TEXT PRIMARY KEY REFERENCES books(id), epubId TEXT NOT NULL UNIQUE REFERENCES books(id))"
         )
     }
 
@@ -37,7 +44,12 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
-        check(old == 1 && new == 2) { "Migration required for version $old to $new" }
+        check(old in 1..2 && new == 3) { "Migration required for version $old to $new" }
+        if (old == 1) migrateSessionAnnotations(db)
+        createPdfEditions(db)
+    }
+
+    private fun migrateSessionAnnotations(db: SQLiteDatabase) {
         // v1 did not record an originating session. Preserve what every existing session could see,
         // then let each copy evolve independently. Future sessions receive no copied annotations.
         db.execSQL("ALTER TABLE annotations RENAME TO annotations_v1")
@@ -156,6 +168,27 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
     fun book(id: String): JSONObject =
         query("SELECT * FROM books WHERE id = ?", arrayOf(id)).optJSONObject(0)
             ?: error("Book unavailable")
+
+    fun books(): JSONArray = query(
+        """
+        SELECT books.*, converted.epubId, origin.pdfId AS sourcePdfId FROM books
+        LEFT JOIN pdf_epub_editions converted ON converted.pdfId = books.id
+        LEFT JOIN pdf_epub_editions origin ON origin.epubId = books.id
+        ORDER BY CASE WHEN format = 'epub' THEN 0 ELSE 1 END, title
+        """.trimIndent()
+    )
+
+    fun convertedEpub(pdfId: String): JSONObject? =
+        query(
+            "SELECT books.* FROM pdf_epub_editions JOIN books ON books.id = epubId WHERE pdfId = ?",
+            arrayOf(pdfId),
+        ).optJSONObject(0)
+
+    fun originalPdf(epubId: String): JSONObject? =
+        query(
+            "SELECT books.* FROM pdf_epub_editions JOIN books ON books.id = pdfId WHERE epubId = ?",
+            arrayOf(epubId),
+        ).optJSONObject(0)
 
     fun session(id: String): JSONObject =
         query("SELECT * FROM sessions WHERE id = ?", arrayOf(id)).optJSONObject(0)

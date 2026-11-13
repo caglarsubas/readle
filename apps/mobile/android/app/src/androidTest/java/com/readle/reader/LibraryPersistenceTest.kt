@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
+import java.util.zip.ZipFile
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
@@ -130,6 +131,79 @@ class LibraryPersistenceTest {
         assertEquals(1, db.sessions(otherId).length())
         assertEquals(otherSession, db.sessions(otherId).getJSONObject(0).getString("id"))
         assertNotEquals(bookId, db.sessions(otherId).getJSONObject(0).getString("bookId"))
+    }
+
+    @Test
+    fun convertedEpubKeepsPageMappingAndPdfSessionThroughRepair() {
+        val importer = BookImporter(context, db)
+        val source = File.createTempFile("pdf-conversion-test-", ".pdf", context.cacheDir)
+        try {
+            context.assets.open("fixtures/readle-sample.pdf").use { input ->
+                source.outputStream().use { input.copyTo(it) }
+            }
+            db.writableDatabase.update(
+                "books",
+                ContentValues().apply { put("path", source.absolutePath) },
+                "id = ?",
+                arrayOf(bookId),
+            )
+            val pdfSession = db.createSession(bookId).getString("id")
+            db.mutateSession(pdfSession) { it.put("readingLocator", JSONObject().put("pageIndex", 1)) }
+            val pdfBefore = db.session(pdfSession).toString()
+            val original = source.readBytes()
+            val edition = importer.convertToEpub(bookId)
+            val epubId = edition.getString("id")
+            val epub = File(edition.getString("path"))
+            assertEquals("epub", edition.getString("format"))
+            assertEquals(bookId, db.originalPdf(epubId)?.getString("id"))
+            ZipFile(epub).use { archive ->
+                val page = archive.getEntry("EPUB/pdf-page-2.xhtml")
+                assertNotNull(page)
+                assertEquals(1, PdfEpubConverter.pageIndex(page.name))
+                val markup = archive.getInputStream(page).bufferedReader().use { it.readText() }
+                assertTrue(markup.contains("PDF page 2"))
+                assertTrue(markup.contains("The weighted average"))
+                assertTrue(markup.contains("pagebreak"))
+                assertNotNull(archive.getEntry("EPUB/pdf-page-3.xhtml"))
+            }
+            assertEquals(0, db.sessions(epubId).length())
+            val epubSession = db.createSession(epubId).getString("id")
+            assertEquals(epubId, importer.convertToEpub(bookId).getString("id"))
+            assertTrue(epub.delete())
+            assertEquals(epubId, importer.convertToEpub(bookId).getString("id"))
+            assertTrue(epub.isFile)
+            assertEquals(epubSession, db.sessions(epubId).getJSONObject(0).getString("id"))
+            assertEquals(pdfBefore, db.session(pdfSession).toString())
+            assertArrayEquals(original, source.readBytes())
+            epub.delete()
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
+    fun pdfWithoutTextDoesNotCreateAnEpubEntry() {
+        val source = File.createTempFile("pdf-no-text-", ".pdf", context.cacheDir)
+        try {
+            com.tom_roush.pdfbox.pdmodel.PDDocument().use { document ->
+                document.addPage(com.tom_roush.pdfbox.pdmodel.PDPage())
+                document.save(source)
+            }
+            db.writableDatabase.update(
+                "books", ContentValues().apply { put("path", source.absolutePath) },
+                "id = ?", arrayOf(bookId),
+            )
+            try {
+                BookImporter(context, db).convertToEpub(bookId)
+                fail("Conversion accepted a PDF without selectable text")
+            } catch (error: IllegalArgumentException) {
+                assertTrue(error.message.orEmpty().contains("OCR"))
+            }
+            assertNull(db.convertedEpub(bookId))
+            assertEquals(1, db.books().length())
+        } finally {
+            source.delete()
+        }
     }
 
     @Test

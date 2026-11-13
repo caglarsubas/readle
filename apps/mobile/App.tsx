@@ -83,6 +83,7 @@ function LibraryScreen() {
   const [tab, setTab] = useState<'library' | 'continue'>('library');
   const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [converting, setConverting] = useState(false);
   const actionInProgress = useRef(false);
   const [error, setError] = useState('');
   const [sampleItems, setSampleItems] = useState<ImportItem[]>([]);
@@ -171,6 +172,22 @@ function LibraryScreen() {
       const session = await library!.createSession(selected!.id);
       await library!.openSession(session.id);
     });
+  const openBook = (book: Book) => {
+    setSessions([]);
+    setSelected(book);
+  };
+  const convertPdf = (pdf: Book) =>
+    run(async () => {
+      setConverting(true);
+      try {
+        const epub = await library!.convertToEpub(pdf.id);
+        const nextBooks = await library!.books();
+        setBooks(nextBooks);
+        openBook(epub);
+      } finally {
+        setConverting(false);
+      }
+    }, false);
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
@@ -247,8 +264,15 @@ function LibraryScreen() {
             </Text>
             <Text style={styles.heading}>{selected.sourceVersion === identityPaperVersion ? identityPaperTitle : selected.title}</Text>
             <Text style={styles.body}>
-              Resume your work, or start with a blank workspace.
+              {selected.sourcePdfId
+                ? 'Converted text. Use Original page in the reader for figures, tables, and equations.'
+                : 'Resume your work, or start with a blank workspace.'}
             </Text>
+            {converting && (
+              <Text style={styles.body} accessibilityLiveRegion="polite">
+                Converting PDF to EPUB on this device…
+              </Text>
+            )}
             {!busy && (
               <View style={styles.actions}>
                 {sessions.length > 0 && (
@@ -258,7 +282,26 @@ function LibraryScreen() {
                   />
                 )}
                 {selected.format === 'pdf' && (
-                  <Action label="Build learning edition" onPress={() => setPlanning('generated')} secondary={sessions.length > 0} />
+                  <>
+                    <Action
+                      label={selected.epubId ? 'View EPUB edition' : 'Convert to EPUB'}
+                      onPress={() => convertPdf(selected)}
+                      secondary={sessions.length > 0}
+                    />
+                    <Action label="Build learning edition" onPress={() => setPlanning('generated')} secondary />
+                  </>
+                )}
+                {selected.sourcePdfId && (
+                  <Action
+                    label="View original PDF"
+                    secondary
+                    onPress={() => {
+                      const pdf = books.find(book => book.id === selected.sourcePdfId);
+                      if (pdf) {
+                        openBook(pdf);
+                      }
+                    }}
+                  />
                 )}
                 {selected.sourceVersion === identityPaperVersion && (
                   <Action label="Plan a walkthrough" onPress={() => setPlanning('sample')} secondary />
@@ -367,7 +410,7 @@ function LibraryScreen() {
                       Make room for a good idea.
                     </Text>
                     <Text style={styles.body}>
-                      Import an EPUB to read, or a PDF to keep as an original source.
+                      Import an EPUB to read, or convert an imported PDF to EPUB.
                       Everything in this build stays on your device.
                     </Text>
                   </View>
@@ -376,10 +419,7 @@ function LibraryScreen() {
                   <Pressable
                     accessibilityRole="button"
                     key={book.id}
-                    onPress={() => {
-                      setSessions([]);
-                      setSelected(book);
-                    }}
+                    onPress={() => openBook(book)}
                     style={styles.bookRow}
                   >
                     <View

@@ -17,11 +17,11 @@ cd ../..
 ./scripts/build-android.sh 18
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-18.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-19.apk`.
 
 ## Install the current Android UAT build
 
-Install Build 18 using **Update**. Import the supplied paper and choose **Build learning edition** after connecting to the local generator. [Build 18 checklist](docs/uat/BUILD_18_WALKTHROUGH.md) · [Build 16 reader checklist](docs/uat/ANDROID_UAT.md).
+Install Build 19 using **Update**. Open an imported PDF in the Library and tap **Convert to EPUB** to make an offline reading edition. **Build learning edition** opens the separate personalized walkthrough setup and uses the Mac generator. [Build 19 checklist](docs/uat/BUILD_19_PDF_TO_EPUB.md) · [Walkthrough checklist](docs/uat/BUILD_18_WALKTHROUGH.md).
 
 ## Try it
 

@@ -88,6 +88,10 @@ class ReaderActivity : AppCompatActivity() {
     private val referencePageIndex by lazy {
         intent.getIntExtra("referencePageIndex", -1).takeIf { it >= 0 }
     }
+    private val originalPagePreview by lazy {
+        referencePageIndex != null && intent.getBooleanExtra("originalPagePreview", false)
+    }
+    private var hasOriginalPdf = false
     private var epubScroll = true
     private var fixedLayout = false
     private var fontSize = 1.0
@@ -105,15 +109,23 @@ class ReaderActivity : AppCompatActivity() {
                 }
         try {
             val session = database.session(sessionId)
-            book = database.book(session.getString("bookId"))
+            val sessionBook = database.book(session.getString("bookId"))
             val state = JSONObject(session.getString("state"))
-            check(state.getString("sourceVersion") == book.getString("sourceVersion")) {
+            check(state.getString("sourceVersion") == sessionBook.getString("sourceVersion")) {
                 "This session requires its original edition."
             }
+            val originalPdf = if (sessionBook.getString("format") == "epub") {
+                database.originalPdf(sessionBook.getString("id"))
+            } else null
+            book = if (originalPagePreview) checkNotNull(originalPdf) { "Original PDF unavailable." }
+                else sessionBook
+            hasOriginalPdf = originalPdf != null && !originalPagePreview
             epubScroll = state.getJSONObject("preferences").optBoolean("epubScroll", true)
             fontSize = state.getJSONObject("preferences").optDouble("fontSize", 1.0)
-            selectedLocator = state.optJSONObject("selection")?.optJSONObject("locator")
-            selectedQuote = state.optJSONObject("selection")?.optString("quote", "") ?: ""
+            if (!originalPagePreview) {
+                selectedLocator = state.optJSONObject("selection")?.optJSONObject("locator")
+                selectedQuote = state.optJSONObject("selection")?.optString("quote", "") ?: ""
+            }
             val root =
                 LinearLayout(this).apply {
                     orientation = 1
@@ -121,21 +133,26 @@ class ReaderActivity : AppCompatActivity() {
                     setPadding(0, 32, 0, 24)
                 }
             val header = LinearLayout(this)
-            header.addView(button(if (referencePageIndex == null) "Library" else "Back to walkthrough") { finish() })
+            val backLabel = when {
+                originalPagePreview -> "Back to EPUB"
+                referencePageIndex != null -> "Back to walkthrough"
+                else -> "Library"
+            }
+            header.addView(button(backLabel) { finish() })
             header.addView(
                 TextView(this).apply {
                     text =
-                        session.getString("label") +
+                        (if (originalPagePreview) "Original" else session.getString("label")) +
                             if (book.getString("format") == "pdf") " · PDF source" else ""
                     textSize = 16f
                     gravity = 17
                 },
                 LinearLayout.LayoutParams(0, 56, 1f),
             )
-            header.addView(button("Notes") { showAnnotations() })
+            if (!originalPagePreview) header.addView(button("Notes") { showAnnotations() })
             root.addView(header)
             val isPdf = book.getString("format") == "pdf"
-            val tools = LinearLayout(this)
+            val tools = LinearLayout(this).apply { isBaselineAligned = false }
             tools.addView(button("Contents") { showContents() })
             if (isPdf) tools.addView(button("Open original") { openOriginalPdf() })
             else {
@@ -143,6 +160,7 @@ class ReaderActivity : AppCompatActivity() {
                 tools.addView(button("Text +") { resize(0.15) })
             }
             tools.addView(button("Find") { findInBook() })
+            if (hasOriginalPdf) tools.addView(button("Original page") { previewOriginalPage() })
             for (index in 0 until tools.childCount) {
                 tools.getChildAt(index).layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
             }
@@ -351,6 +369,7 @@ class ReaderActivity : AppCompatActivity() {
             } ?: locator
         selectedLocator = anchor
         selectedQuote = quote
+        if (originalPagePreview) return
         database.mutateSession(sessionId) {
             it.put(
                 "selection",
@@ -405,7 +424,9 @@ class ReaderActivity : AppCompatActivity() {
             pdf = PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY))
             PDFBoxResourceLoader.init(applicationContext)
             pdfText = PDDocument.load(file)
-            showPdf(initial?.optInt("pageIndex", 0) ?: 0)
+            val initialPage = initial?.optInt("pageIndex", 0) ?: 0
+            require(initialPage in 0 until pdf!!.pageCount) { "Original PDF page unavailable." }
+            showPdf(initialPage)
         } catch (e: Exception) {
             showError(e.message ?: "Cannot open PDF")
         }
@@ -448,7 +469,7 @@ class ReaderActivity : AppCompatActivity() {
                     sortByPosition = true
                 }
             extractor.getText(pdfText)
-            val annotations = database.annotations(sessionId)
+            val annotations = if (originalPagePreview) JSONArray() else database.annotations(sessionId)
             val marks = mutableListOf<PdfHighlight>()
             for (i in 0 until annotations.length()) {
                 val row = annotations.getJSONObject(i)
@@ -558,7 +579,7 @@ class ReaderActivity : AppCompatActivity() {
         selectedLocator = null
         selectedQuote = ""
         pdfPage?.clearSelection()
-        database.mutateSession(sessionId) { it.put("selection", JSONObject.NULL) }
+        if (!originalPagePreview) database.mutateSession(sessionId) { it.put("selection", JSONObject.NULL) }
         status.text = pdfStatus()
     }
 
@@ -683,6 +704,21 @@ class ReaderActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(intent, "Open original PDF"))
     }
 
+    private fun previewOriginalPage() {
+        val href = epub?.currentLocator?.value?.href?.toString().orEmpty()
+        val index = PdfEpubConverter.pageIndex(href)
+        if (index == null) {
+            Toast.makeText(this, "Open a page in the EPUB first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, ReaderActivity::class.java)
+                .putExtra("sessionId", sessionId)
+                .putExtra("referencePageIndex", index)
+                .putExtra("originalPagePreview", true),
+        )
+    }
+
     private fun selectionIsSaved(rows: JSONArray): Boolean =
         selectedLocator != null &&
             (0 until rows.length()).any {
@@ -719,7 +755,9 @@ class ReaderActivity : AppCompatActivity() {
         applyEpubHighlights()
         panel.show("Selected passage") {
             addView(panel.text(selectedQuote.take(280)).apply { maxLines = 3 })
-            panel.addActions(this, "Highlight" to { saveAnnotation("") }, "Add note" to ::addNote)
+            if (!originalPagePreview) {
+                panel.addActions(this, "Highlight" to { saveAnnotation("") }, "Add note" to ::addNote)
+            }
             panel.addActions(
                 this,
                 "Copy" to

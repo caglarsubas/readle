@@ -11,9 +11,80 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipFile
 import javax.xml.parsers.DocumentBuilderFactory
+import org.json.JSONObject
 
 class BookImporter(private val context: Context, private val database: LibraryDatabase) {
     private val limit = 128L * 1024 * 1024
+
+    fun convertToEpub(pdfId: String): JSONObject {
+        val pdf = database.book(pdfId)
+        require(pdf.getString("format") == "pdf") { "Choose a PDF to convert." }
+        val prior = database.convertedEpub(pdfId)
+        if (prior != null && File(prior.getString("path")).isFile) return prior
+        val source = File(pdf.getString("path"))
+        require(source.isFile && source.length() in 1..limit) {
+            "Original PDF unavailable. Import it again to convert it."
+        }
+        val title = pdf.getString("title") + " (EPUB)"
+        val temporary = File.createTempFile("converted-", ".epub", context.cacheDir)
+        try {
+            PdfEpubConverter.write(context, source, temporary, title, pdf.getString("sourceVersion"))
+            validateEpub(temporary)
+            val digest = MessageDigest.getInstance("SHA-256")
+            temporary.inputStream().use { input ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val size = input.read(buffer)
+                    if (size < 0) break
+                    digest.update(buffer, 0, size)
+                }
+            }
+            val hash = digest.digest().joinToString("") { "%02x".format(it) }
+            val db = database.writableDatabase
+            db.beginTransaction()
+            try {
+                val linked = database.convertedEpub(pdfId)
+                if (linked != null) {
+                    val path = File(linked.getString("path"))
+                    if (!path.isFile) {
+                        check(linked.getString("sourceVersion") == hash) {
+                            "This EPUB could not be restored with the original text. Use the PDF source."
+                        }
+                        preserveSource(temporary, path)
+                    }
+                    db.setTransactionSuccessful()
+                    return linked
+                }
+                val existing = database.query(
+                    "SELECT * FROM books WHERE sourceVersion = ?", arrayOf(hash),
+                ).optJSONObject(0)
+                val epubId = existing?.getString("id") ?: UUID.randomUUID().toString()
+                val destination = existing?.let { File(it.getString("path")) }
+                    ?: File(context.filesDir, "books/$hash.epub")
+                preserveSource(temporary, destination)
+                if (existing == null) {
+                    db.insertOrThrow("books", null, ContentValues().apply {
+                        put("id", epubId)
+                        put("title", title)
+                        put("format", "epub")
+                        put("path", destination.absolutePath)
+                        put("sourceVersion", hash)
+                    })
+                }
+                db.insertOrThrow("pdf_epub_editions", null, ContentValues().apply {
+                    put("pdfId", pdfId)
+                    put("epubId", epubId)
+                })
+                val result = database.book(epubId)
+                db.setTransactionSuccessful()
+                return result
+            } finally {
+                db.endTransaction()
+            }
+        } finally {
+            temporary.delete()
+        }
+    }
 
     fun register(uri: Uri, displayName: String? = null): String {
         val name =
