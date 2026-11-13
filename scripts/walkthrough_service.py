@@ -13,13 +13,15 @@ import re
 import threading
 
 from test_pdf_walkthrough import (
-    LocalModel, TEXT, build_unit, extract_pages, inventory, obj, plan_route,
+    TEXT, build_unit, extract_pages, inventory, obj, plan_route,
     review_unit, revise_application_item, save_json, validate,
 )
+from walkthrough_engine import InferenceEngine, provider_settings
 
 MAX_SOURCE = 32 * 1024 * 1024
 MAX_PAGES = 120
-SAMPLE_REVIEW = Path(__file__).resolve().parents[1] / "tests/fixtures/identity_application_review.json"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SAMPLE_REVIEW = PROJECT_ROOT / "tests/fixtures/identity_application_review.json"
 JOB_PATH = re.compile(r"/v1/walkthroughs/([0-9a-f-]{36})")
 
 
@@ -41,9 +43,10 @@ def sample_application_item(corrections, source_version, lesson, evidence):
 
 
 class Jobs:
-    def __init__(self, root, cache, author, reviewer):
+    def __init__(self, root, cache, engine, author, reviewer):
         self.root = root
         self.cache = cache
+        self.engine = engine
         self.author = author
         self.reviewer = reviewer
         self.lock = threading.Lock()
@@ -92,8 +95,7 @@ class Jobs:
             if any(not re.search(r"\w{3,}", page) for page in pages.values()):
                 raise ValueError("A page needs OCR. Use a PDF with selectable text on every page.")
             profile = request["profile"]
-            author = LocalModel(self.author, self.cache)
-            reviewer = LocalModel(self.reviewer, self.cache)
+            author, reviewer = self.engine.models(self.cache, self.author, self.reviewer)
             update(f"Indexing {len(pages)} PDF pages")
             batches, evidence = inventory(pages, author)
             update("Planning your learning path")
@@ -125,8 +127,8 @@ class Jobs:
                 "version": 1, "title": title if title != "source" else "Learning edition",
                 "sourceVersion": request["sourceVersion"], "pageCount": len(pages),
                 "profile": profile, "rationale": route["rationale"], "lessons": lessons,
-                "citations": citations, "author": author.model, "authorDigest": author.digest,
-                "reviewer": reviewer.model, "reviewerDigest": reviewer.digest,
+                "citations": citations, "author": author.model, "reviewer": reviewer.model,
+                "provider": "inference-engine",
             }
             save_json(folder / "edition.json", result)
             save_json(folder / "status.json", {"state": "ready", "edition": result})
@@ -180,12 +182,21 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--cache", type=Path, help="Existing stage cache from the PDF test")
-    parser.add_argument("--author", default="qwen3.8:27b")
-    parser.add_argument("--reviewer", default="ministral-3:8b")
+    parser.add_argument("--cache", type=Path, help="Directory for validated inference stages")
+    parser.add_argument("--author", help="Author model ID (defaults to qwen3.8:27b)")
+    parser.add_argument("--reviewer", help="Reviewer model ID (defaults to LLM_PROVIDER_MODEL)")
     args = parser.parse_args()
     os.umask(0o077)
-    jobs = Jobs(args.out / "jobs", args.cache or args.out, args.author, args.reviewer)
+    settings = provider_settings(PROJECT_ROOT / ".env")
+    author = args.author or settings.get("LLM_PROVIDER_AUTHOR_MODEL") or "qwen3.8:27b"
+    reviewer = args.reviewer or settings.get("LLM_PROVIDER_MODEL")
+    try:
+        if not reviewer:
+            raise ValueError("Set LLM_PROVIDER_MODEL in the Mac service environment or .env.")
+        engine = InferenceEngine(settings)
+    except ValueError as error:
+        parser.error(str(error))
+    jobs = Jobs(args.out / "jobs", args.cache or args.out, engine, author, reviewer)
     with ThreadingHTTPServer(("127.0.0.1", 8765), Handler) as server:
         server.jobs = jobs
         print("Readle walkthrough service on 127.0.0.1:8765", flush=True)

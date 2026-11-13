@@ -66,7 +66,41 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-class LocalModel:
+class StageModel:
+    def ask(self, stage, instructions, data, schema, verify=lambda _: None):
+        prompt = instructions + "\n\nINPUT DATA\n" + json.dumps(data, ensure_ascii=False)
+        messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        request = self.request(messages, schema)
+        identity = hashlib.sha256(json.dumps([self.cache_scope, request], sort_keys=True).encode()).hexdigest()
+        cached = self.output / "stages" / f"{stage}-{identity[:16]}.json"
+        if cached.exists():
+            result = json.loads(cached.read_text())["result"]
+            validate(result, schema)
+            verify(result)
+            print(f"{stage}: cached", flush=True)
+            return result
+        for attempt in range(3):
+            content, finish_reason, usage = self.complete(request)
+            try:
+                if finish_reason == "length":
+                    raise ValueError("output reached the token limit")
+                result = json.loads(content)
+                validate(result, schema)
+                verify(result)
+            except ValueError as error:
+                print(f"{stage}: retry {attempt + 1}: {error}", flush=True)
+                if attempt == 2:
+                    raise
+                request["messages"][-1]["content"] = prompt + f"\nCorrect this validation error: {error}"
+                self.advance_seed(request)
+                continue
+            save_json(cached, {"result": result, "request_sha256": identity, "attempt": attempt + 1,
+                               **usage})
+            print(f"{stage}: validated ({usage.get('input_tokens')} input tokens)", flush=True)
+            return result
+
+
+class LocalModel(StageModel):
     def __init__(self, model, output):
         self.model = model
         self.output = output
@@ -76,45 +110,28 @@ class LocalModel:
         self.digest = next((item["digest"] for item in models if item["name"] == model), None)
         if self.digest is None or ":cloud" in model or model.endswith("-cloud"):
             raise ValueError("Use a locally installed Ollama model.")
+        self.cache_scope = self.digest
 
-    def ask(self, stage, instructions, data, schema, verify=lambda _: None):
-        prompt = instructions + "\n\nINPUT DATA\n" + json.dumps(data, ensure_ascii=False)
-        request = {
+    def request(self, messages, schema):
+        return {
             "model": self.model, "stream": False, "think": False, "format": schema,
-            "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+            "messages": messages,
             "options": {"temperature": 0.15, "num_ctx": 16384, "num_predict": 4096, "seed": 29},
         }
-        identity = hashlib.sha256(json.dumps([self.digest, request], sort_keys=True).encode()).hexdigest()
-        cached = self.output / "stages" / f"{stage}-{identity[:16]}.json"
-        if cached.exists():
-            result = json.loads(cached.read_text())["result"]
-            validate(result, schema)
-            verify(result)
-            print(f"{stage}: cached", flush=True)
-            return result
-        for attempt in range(3):
-            body = json.dumps(request).encode()
-            with self.opener.open(Request(f"{LOCAL_OLLAMA}/api/chat", body, {"Content-Type": "application/json"}),
-                                  timeout=360) as response:
-                reply = json.load(response)
-            try:
-                if reply["done_reason"] == "length":
-                    raise ValueError("output reached the token limit")
-                result = json.loads(reply["message"]["content"])
-                validate(result, schema)
-                verify(result)
-            except ValueError as error:
-                print(f"{stage}: retry {attempt + 1}: {error}", flush=True)
-                if attempt == 2:
-                    raise
-                request["messages"][-1]["content"] = prompt + f"\nCorrect this validation error: {error}"
-                request["options"]["seed"] += 1
-                continue
-            save_json(cached, {"result": result, "request_sha256": identity, "attempt": attempt + 1,
-                               "input_tokens": reply.get("prompt_eval_count"),
-                               "output_tokens": reply.get("eval_count")})
-            print(f"{stage}: validated ({reply.get('prompt_eval_count')} input tokens)", flush=True)
-            return result
+
+    def complete(self, request):
+        body = json.dumps(request).encode()
+        with self.opener.open(Request(f"{LOCAL_OLLAMA}/api/chat", body, {"Content-Type": "application/json"}),
+                              timeout=360) as response:
+            reply = json.load(response)
+        return reply["message"]["content"], reply["done_reason"], {
+            "input_tokens": reply.get("prompt_eval_count"),
+            "output_tokens": reply.get("eval_count"),
+        }
+
+    @staticmethod
+    def advance_seed(request):
+        request["options"]["seed"] += 1
 
 
 def save_json(path, value):

@@ -4,7 +4,9 @@ Install the signed APK using **Update**. About shows `0.1.0-spike · Build 18` u
 
 ## Start generation on the Mac
 
-From the Readle checkout, run the local service in a terminal. It uses Python 3.11+, Poppler (`pdfinfo` and `pdftotext`), and the local Ollama models `qwen3.8:27b` and `ministral-3:8b`. For this build use a PDF with selectable text, up to 32 MB and 120 pages.
+From the Readle checkout, run the Mac service in a terminal. It uses Python 3.11+, Poppler (`pdfinfo` and `pdftotext`), and the authenticated local inference engine. Set `LLM_PROVIDER_BASE_URL`, `LLM_PROVIDER_API_KEY`, `LLM_PROVIDER_TENANT_ID`, `LLM_PROVIDER_ORG_ID`, `LLM_PROVIDER_KEY_ID` and `LLM_PROVIDER_MODEL` in the checkout's ignored `.env` or the Mac service environment. The service uses `qwen3.8:27b` as author unless overridden by `LLM_PROVIDER_AUTHOR_MODEL`. The configured `LLM_PROVIDER_MODEL` is the reviewer. The key stays on the Mac.
+
+For this build use a PDF with selectable text, up to 32 MB and 120 pages.
 
 ```sh
 python3 scripts/walkthrough_service.py --out output/walkthrough/build-18 \
@@ -18,7 +20,7 @@ Connect your phone to the Mac by USB, enable USB debugging for the UAT device, a
 ~/Library/Android/sdk/platform-tools/adb -s PHONE_SERIAL reverse tcp:8765 tcp:8765
 ```
 
-Leave the service running while creating a walkthrough. Restore the port forwarding after reconnecting USB if Android reports that it cannot reach the Mac. The service binds to Mac loopback and calls local inference. Job records and the uploaded source stay under the ignored output directory. The phone saves completed editions and their progress in its local database. You can disconnect the phone once the first lesson opens.
+Leave the service running while creating a walkthrough. Restore the port forwarding after reconnecting USB if Android reports that it cannot reach the Mac. The service binds to Mac loopback and sends new inference requests to the engine's `/v1/chat/completions` endpoint with the Readle bearer key. Validated stage files include the engine request ID when provided. Existing completed editions remain readable, and new jobs use a separate cache from the earlier direct Ollama runs. Job records and the uploaded source stay under the ignored output directory. The phone saves completed editions and their progress in its local database. You can disconnect the phone once the first lesson opens.
 
 ## Checklist
 
