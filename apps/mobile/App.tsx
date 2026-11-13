@@ -12,6 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Book, ImportItem, library, Session } from './src/library';
+import { GeneratedLessonScreen, GeneratedSetup, GenerationProgress } from './src/GeneratedWalkthroughScreen';
+import { isGeneratedCursor } from './src/generatedWalkthrough';
+import type { GeneratedCursor, LearningEdition } from './src/generatedWalkthrough';
 import {WalkthroughLesson, WalkthroughSetup} from './src/WalkthroughScreen';
 import {identityPaperTitle, identityPaperVersion, isWalkthroughCursor} from './src/walkthrough';
 import type {WalkthroughCursor} from './src/walkthrough';
@@ -83,21 +86,25 @@ function LibraryScreen() {
   const actionInProgress = useRef(false);
   const [error, setError] = useState('');
   const [sampleItems, setSampleItems] = useState<ImportItem[]>([]);
-  const [planning, setPlanning] = useState(false);
+  const [planning, setPlanning] = useState<'generated' | 'sample' | null>(null);
+  const [generated, setGenerated] = useState<{
+    id: string; cursor: GeneratedCursor; edition: LearningEdition | null; start: boolean;
+  } | null>(null);
   const [walkthrough, setWalkthrough] = useState<{id: string; cursor: WalkthroughCursor} | null>(null);
   useEffect(() => {
-    if (!planning && !walkthrough) {
+    if (!planning && !walkthrough && !generated) {
       return;
     }
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!busy) {
-        setPlanning(false);
+        setPlanning(null);
         setWalkthrough(null);
+        setGenerated(null);
       }
       return true;
     });
     return () => subscription.remove();
-  }, [busy, planning, walkthrough]);
+  }, [busy, planning, walkthrough, generated]);
   const refresh = useCallback(async () => {
     if (!library) {
       return;
@@ -146,6 +153,11 @@ function LibraryScreen() {
     run(async () => {
       if (session.mode === 'learn') {
         const cursor = await library!.learningCursor(session.id);
+        if (isGeneratedCursor(cursor)) {
+          const edition = await library!.learningEdition(session.id);
+          setGenerated({id: session.id, cursor, edition, start: false});
+          return;
+        }
         if (!isWalkthroughCursor(cursor)) {
           throw new Error('This saved walkthrough could not be restored.');
         }
@@ -164,31 +176,52 @@ function LibraryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
       <View style={styles.header}>
         <Text style={styles.brand}>readle</Text>
-        {planning || walkthrough ? (
+        {planning || walkthrough || generated ? (
           <Action label="Back to sessions" secondary onPress={() => {
             if (!busy) {
-              setPlanning(false);
+              setPlanning(null);
               setWalkthrough(null);
+              setGenerated(null);
             }
           }} />
         ) : (
           <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
         )}
       </View>
-      <ScrollView key={walkthrough?.cursor.lesson ?? (planning ? 'planning' : 'library')}
+      <ScrollView keyboardShouldPersistTaps="handled" key={generated ? `${generated.id}-${generated.cursor.lesson}-${generated.cursor.pass}` : walkthrough?.cursor.lesson ?? (planning ? 'planning' : 'library')}
         contentContainerStyle={styles.content}>
-        {walkthrough ? (
+        {generated ? (
+          generated.edition ? (
+            <GeneratedLessonScreen cursor={generated.cursor} edition={generated.edition} busy={busy}
+              onChange={cursor => run(async () => {
+                await library!.saveLearningCursor(generated.id, cursor);
+                setGenerated({...generated, cursor});
+              }, false)}
+              onSource={page => run(() => library!.openWalkthroughSource(generated.id, page), false)} />
+          ) : (
+            <GenerationProgress sessionId={generated.id} start={generated.start}
+              onReady={edition => setGenerated(current => current?.id === generated.id ? {...current, edition, start: false} : current)} />
+          )
+        ) : walkthrough ? (
           <WalkthroughLesson cursor={walkthrough.cursor} busy={busy}
             onChange={cursor => run(async () => {
               await library!.saveLearningCursor(walkthrough.id, cursor);
               setWalkthrough({...walkthrough, cursor});
             }, false)}
             onSource={page => run(() => library!.openWalkthroughSource(walkthrough.id, page), false)} />
-        ) : planning && selected ? (
+        ) : planning === 'generated' && selected ? (
+          <GeneratedSetup title={selected.sourceVersion === identityPaperVersion ? identityPaperTitle : selected.title}
+            busy={busy} onStart={profile => run(async () => {
+              const session = await library!.createGeneratedWalkthrough(selected.id, profile);
+              const cursor: GeneratedCursor = {version: 2, profile, lesson: 0, pass: 1, drafts: {}, submissions: {}};
+              setGenerated({id: session.id, cursor, edition: null, start: true});
+              setPlanning(null);
+            })} />
+        ) : planning === 'sample' && selected ? (
           <WalkthroughSetup busy={busy} onStart={cursor => run(async () => {
             const session = await library!.createWalkthrough(selected.id, cursor);
             setWalkthrough({id: session.id, cursor});
-            setPlanning(false);
+            setPlanning(null);
           })} />
         ) : about ? (
           <>
@@ -224,8 +257,11 @@ function LibraryScreen() {
                     onPress={() => open(sessions[0])}
                   />
                 )}
+                {selected.format === 'pdf' && (
+                  <Action label="Build learning edition" onPress={() => setPlanning('generated')} secondary={sessions.length > 0} />
+                )}
                 {selected.sourceVersion === identityPaperVersion && (
-                  <Action label="Plan a walkthrough" onPress={() => setPlanning(true)} secondary={sessions.length > 0} />
+                  <Action label="Plan a walkthrough" onPress={() => setPlanning('sample')} secondary />
                 )}
                 <Action
                   label={
@@ -426,7 +462,7 @@ function LibraryScreen() {
             {error}
           </Text>
         )}
-        {!planning && !walkthrough && (
+        {!planning && !walkthrough && !generated && (
           <Text style={styles.footer}>
             Each new session starts without notes or highlights from other sessions.
           </Text>

@@ -2,7 +2,7 @@
 
 Readle helps learners follow a recommended walkthrough through a book's ideas, with independent, resumable sessions and direct access to the original source. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
 
-Android Build 17 includes a curated walkthrough for *Identity Management for Agentic AI* (arXiv:2510.25819v1). The learner chooses a goal and experience level, works through a recommended lesson sequence, and can inspect the cited PDF pages. The EPUB reader, PDF reference view and local sessions are also available. The local development harness can generate three-pass walkthroughs from text PDFs. Mobile generation, the native iOS reader, AI chat and sync are pending. [Whole-document walkthrough test](docs/uat/AUTOMATIC_WALKTHROUGH.md).
+Android Build 18 generates a saved three-pass learning edition from a text PDF and learner profile using the local Mac service. Follow the setup and acceptance steps in the [Build 18 walkthrough checklist](docs/uat/BUILD_18_WALKTHROUGH.md).
 
 ## Run and build
 
@@ -14,14 +14,14 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 17
+./scripts/build-android.sh 18
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-17.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-18.apk`.
 
 ## Install the current Android UAT build
 
-Install Build 17 using **Update**, or run `./scripts/install-android-uat.sh 17` with one authorized phone connected by USB. Confirm the build in **About**. Import your copy of `2510.25819v1.pdf` and select **Plan a walkthrough**. [Build 17 checklist](docs/uat/BUILD_17_WALKTHROUGH.md) · [Build 16 reader checklist](docs/uat/ANDROID_UAT.md).
+Install Build 18 using **Update**. Import the supplied paper and choose **Build learning edition** after connecting to the local generator. [Build 18 checklist](docs/uat/BUILD_18_WALKTHROUGH.md) · [Build 16 reader checklist](docs/uat/ANDROID_UAT.md).
 
 ## Try it
 

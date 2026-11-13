@@ -10,28 +10,35 @@ import {
 } from './walkthrough';
 import type { Experience, Goal, WalkthroughCursor } from './walkthrough';
 
-function Choice({
+export function Choice({
   label,
   selected,
+  disabled = false,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.choice, selected && styles.selected]}
+      style={[
+        styles.choice,
+        selected && styles.selected,
+        disabled && styles.disabled,
+      ]}
     >
       <Text style={styles.label}>{label}</Text>
     </Pressable>
   );
 }
 
-function Button({
+export function Button({
   label,
   onPress,
   primary = false,
@@ -261,7 +268,7 @@ export function WalkthroughLesson({
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   content: { gap: 16, paddingBottom: 20 },
   group: { gap: 8 },
   title: {

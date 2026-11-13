@@ -282,6 +282,62 @@ def build_unit(model, profile_id, profile, number, unit, evidence, pages, revisi
     return {**unit, "id": f"concept-{number}", **lesson}
 
 
+def revise_application_item(author, reviewer, profile_id, lesson, profile, evidence, pages):
+    """Keep the first question and author a separate, checked scenario for the second."""
+    option_keys = ("a", "b", "c", "d")
+    sources = {key: evidence[key] for key in lesson["source_ids"]}
+    schema = obj(scenario=TEXT, stem=TEXT, options=obj(**dict.fromkeys(option_keys, TEXT)),
+                 answer=choice(option_keys), rationale=TEXT, source_ids=arr(choice(sources), 1, 3))
+    source_pages = {item["page"]: pages[item["page"]] for item in sources.values()}
+
+    def verify(item):
+        if len(item["scenario"].split()) < 14:
+            raise ValueError("Give the scenario actors, a requested action and concrete constraints.")
+        if len({normalize(option).casefold() for option in item["options"].values()}) != 4:
+            raise ValueError("Use four distinct decisions.")
+        if not set(re.findall(r"\bE\d{3,}\b", json.dumps(item))).issubset(sources):
+            raise ValueError("Use only the selected evidence.")
+
+    prefix = f"{profile_id}-{lesson['id']}-application"
+    task = (
+        "Write a transfer question in a new fictional setting unlike the paper's worked cases. "
+        "Provide actors, the specific attempted action, and at least two concrete facts or "
+        "constraints. Ask the learner to decide what to do or predict the outcome. The answer "
+        "must depend on facts in the scenario. Avoid definitions, recognition of acronyms, "
+        "or prompts that can be answered without reading the scenario. Give four plausible "
+        "decisions of similar length and a rationale applying the source rule to the facts. "
+        "Do not write the scenario as a definition of the correct answer."
+    )
+    inputs = {"learner": profile, "objective": lesson["objective"], "evidence": sources,
+              "source_pages": source_pages}
+    for attempt in range(2):
+        item = author.ask(f"{prefix}-{attempt + 1}", task, inputs, schema, verify)
+        # Review sees the full item and the sources, with the answer and rationale withheld.
+        visible_item = {key: item[key] for key in ("scenario", "stem", "options", "source_ids")}
+        verdict = reviewer.ask(
+            f"{prefix}-review",
+            "Solve this question from the evidence. Set applies to yes only if choosing the answer "
+            "requires using concrete facts in the scenario. General definitions, acronym "
+            "recognition, and decorative stories are insufficient. Identify the correct option "
+            "or mark ambiguous if two choices are defensible or evidence is insufficient.",
+            {"item": visible_item, "evidence": sources, "source_pages": source_pages},
+            obj(applies=choice(("yes", "no")), key=choice((*option_keys, "ambiguous")), reason=TEXT),
+        )
+        if verdict["applies"] == "yes" and verdict["key"] == item["answer"]:
+            break
+        inputs["review_findings"] = verdict["reason"]
+    inline_refs = re.findall(r"\bE\d{3,}\b", json.dumps(item))
+    item["source_ids"] = list(dict.fromkeys([*item["source_ids"], *inline_refs]))
+    item["stem"] = item.pop("scenario") + "\n\n" + item["stem"]
+    item["application_verified"] = verdict["applies"] == "yes" and verdict["key"] == item["answer"]
+    # Avoid a fixed answer position in the separate transfer prompt.
+    order = list(option_keys)
+    random.Random(prefix).shuffle(order)
+    item["answer"] = option_keys[order.index(item["answer"])]
+    item["options"] = dict(zip(option_keys, (item["options"][old] for old in order)))
+    return {**lesson, "assessment": [lesson["assessment"][0], item]}
+
+
 def review_unit(reviewer, profile_id, lesson, evidence, pages):
     sources = {key: evidence[key] for key in lesson["source_ids"]}
     review_input = {
@@ -305,7 +361,7 @@ def review_unit(reviewer, profile_id, lesson, evidence, pages):
         "and a brief rationale. Don't infer an answer from the order of the options.",
         review_input, obj(lesson_status=choice(("supported", "needs_review")), lesson_note=TEXT,
                           assessments=arr(finding, 2, 2)))
-    matches = [result["key"] == item["answer"]
+    matches = [result["key"] == item["answer"] and item.get("application_verified", True)
                for result, item in zip(verdict["assessments"], lesson["assessment"])]
     return {**lesson, "review": verdict,
             "assessment_key_matches": matches,
