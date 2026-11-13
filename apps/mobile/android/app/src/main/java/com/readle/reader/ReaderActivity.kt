@@ -85,6 +85,9 @@ class ReaderActivity : AppCompatActivity() {
         )
     }
     private var pageIndex = 0
+    private val referencePageIndex by lazy {
+        intent.getIntExtra("referencePageIndex", -1).takeIf { it >= 0 }
+    }
     private var epubScroll = true
     private var fixedLayout = false
     private var fontSize = 1.0
@@ -118,7 +121,7 @@ class ReaderActivity : AppCompatActivity() {
                     setPadding(0, 32, 0, 24)
                 }
             val header = LinearLayout(this)
-            header.addView(button("Library") { finish() })
+            header.addView(button(if (referencePageIndex == null) "Library" else "Back to walkthrough") { finish() })
             header.addView(
                 TextView(this).apply {
                     text =
@@ -184,7 +187,8 @@ class ReaderActivity : AppCompatActivity() {
             root.post {
                 WindowInsetsControllerCompat(window, root).isAppearanceLightStatusBars = true
             }
-            val locator = state.optJSONObject("readingLocator")
+            val locator = referencePageIndex?.let { JSONObject().put("pageIndex", it) }
+                ?: state.optJSONObject("readingLocator")
             content.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
                 if (pdf != null && right - left != oldRight - oldLeft) {
                     content.removeCallbacks(resizePdf)
@@ -507,19 +511,21 @@ class ReaderActivity : AppCompatActivity() {
                             .map { selectionPages.getJSONObject(it) }
                             .find { it.optInt("pageIndex", -1) == index }
                 )
-            val offsetY =
-                if (prior?.optInt("pageIndex", -1) == index) prior.optDouble("offsetY", 0.0)
-                else 0.0
-            database.mutateSession(sessionId) {
-                it.put(
-                    "readingLocator",
-                    JSONObject()
-                        .put("pageIndex", pageIndex)
-                        .put("offsetX", 0)
-                        .put("offsetY", offsetY),
-                )
-                it.put("locationLabel", "Page ${pageIndex + 1}")
-                it.getJSONObject("preferences").put("pdfZoom", 1.0)
+            val offsetY = if (referencePageIndex == null && prior?.optInt("pageIndex", -1) == index) {
+                prior.optDouble("offsetY", 0.0)
+            } else 0.0
+            if (referencePageIndex == null) {
+                database.mutateSession(sessionId) {
+                    it.put(
+                        "readingLocator",
+                        JSONObject()
+                            .put("pageIndex", pageIndex)
+                            .put("offsetX", 0)
+                            .put("offsetY", offsetY),
+                    )
+                    it.put("locationLabel", "Page ${pageIndex + 1}")
+                    it.getJSONObject("preferences").put("pdfZoom", 1.0)
+                }
             }
             pdfScroll!!.setOnScrollChangeListener(null)
             view.post {
@@ -536,6 +542,7 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun persistPdfPosition() {
+        if (referencePageIndex != null) return
         val page = pdfPage ?: return
         val offset = (pdfScroll?.scrollY ?: 0).toDouble() / page.height.coerceAtLeast(1)
         database.mutateSession(sessionId) {

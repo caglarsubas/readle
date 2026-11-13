@@ -92,7 +92,13 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
         db.execSQL("DROP TABLE annotations_v1")
     }
 
-    private fun sessionValues(id: String, bookId: String, label: String, source: String) =
+    private fun sessionValues(
+        id: String,
+        bookId: String,
+        label: String,
+        source: String,
+        learningCursor: JSONObject? = null,
+    ) =
         ContentValues().apply {
             put("id", id)
             put("bookId", bookId)
@@ -100,9 +106,9 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
             put(
                 "state",
                 JSONObject()
-                    .put("mode", "read")
+                    .put("mode", if (learningCursor == null) "read" else "learn")
                     .put("readingLocator", JSONObject.NULL)
-                    .put("learningCursor", JSONObject.NULL)
+                    .put("learningCursor", learningCursor ?: JSONObject.NULL)
                     .put("selection", JSONObject.NULL)
                     .put("visualState", JSONObject())
                     .put("quizDraft", JSONObject.NULL)
@@ -166,7 +172,9 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
         for (i in 0 until rows.length()) {
             val row = rows.getJSONObject(i)
             val state = JSONObject(row.getString("state"))
-            row.put("location", state.optString("locationLabel", "Beginning"))
+            val mode = state.optString("mode", "read")
+            row.put("mode", mode)
+            row.put("location", if (mode == "learn") "Walkthrough" else state.optString("locationLabel", "Beginning"))
             val sourceBook = book(row.getString("bookId"))
             row.put(
                 "bookTitle",
@@ -177,7 +185,7 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
     }
 
     @Synchronized
-    fun createSession(bookId: String): JSONObject {
+    fun createSession(bookId: String, learningCursor: JSONObject? = null): JSONObject {
         book(bookId)
         writableDatabase.beginTransaction()
         try {
@@ -194,10 +202,13 @@ class LibraryDatabase(context: Context, databaseName: String = "readle.db") :
                     bookId,
                     "Session ${count + 1}",
                     book(bookId).getString("sourceVersion"),
+                    learningCursor,
                 ),
             )
             writableDatabase.setTransactionSuccessful()
-            return session(id).put("location", "Beginning")
+            return session(id)
+                .put("mode", if (learningCursor == null) "read" else "learn")
+                .put("location", if (learningCursor == null) "Beginning" else "Walkthrough")
         } finally {
             writableDatabase.endTransaction()
         }

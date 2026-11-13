@@ -1,4 +1,5 @@
 import { NativeModules } from 'react-native';
+import type {WalkthroughCursor} from './walkthrough';
 export type Book = {
   id: string;
   title: string;
@@ -13,6 +14,7 @@ export type Session = {
   location: string;
   updatedAt: number;
   revision: number;
+  mode?: 'read' | 'learn';
 };
 export type ImportItem = {
   id: string;
@@ -33,5 +35,9 @@ interface LibraryBridge {
   retryImport(itemId: string): Promise<ImportItem[]>;
   createSession(bookId: string): Promise<Session>;
   openSession(sessionId: string): Promise<void>;
+  createWalkthrough(bookId: string, cursor: WalkthroughCursor): Promise<Session>;
+  learningCursor(sessionId: string): Promise<unknown>;
+  saveLearningCursor(sessionId: string, cursor: WalkthroughCursor): Promise<void>;
+  openWalkthroughSource(sessionId: string, printedPage: number): Promise<void>;
 }
 export const library: LibraryBridge | undefined = NativeModules.ReadleLibrary;

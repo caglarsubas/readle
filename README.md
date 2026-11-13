@@ -1,8 +1,8 @@
 # Readle
 
-An offline reader with independent, resumable workspaces for each book. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
+Readle helps learners follow a recommended walkthrough through a book's ideas, with independent, resumable sessions and direct access to the original source. The product blueprint is `AI_Reading_Learning_Platform_Codex_Spec_v1.3.md` plus the accepted saved-session and Android UAT additions.
 
-The current deliverable is an EPUB-first Android reader, with PDF retained as an original-source reference view. It opens original PDF pages and EPUBs, imports multiple files independently, persists sessions in SQLite, and stores source-linked highlights and notes independently in each session. The React Native iOS shell is present. The native iOS reader, AI, guided learning, backend, and sync milestones are pending. Phase A requires physical iOS and Android evidence before acceptance.
+Android Build 17 includes a curated walkthrough for *Identity Management for Agentic AI* (arXiv:2510.25819v1). The learner chooses a goal and experience level, works through a recommended lesson sequence, and can inspect the cited PDF pages. The EPUB reader, PDF reference view and local sessions are also available. Automatic learning edition generation, the native iOS reader, AI chat and sync are pending.
 
 ## Run and build
 
@@ -14,14 +14,14 @@ npm ci
 npm run typecheck
 npm test -- --runInBand
 cd ../..
-./scripts/build-android.sh 15
+./scripts/build-android.sh 17
 ```
 
-The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-14.apk`.
+The build script creates a private UAT signing identity under `~/.local/share/readle`, reuses it on later builds, and writes a standalone APK under `output/android`. Preserve that signing directory securely for future updates. Increase the build number for each handoff. Install using Android's file installer or `adb install -r output/android/readle-uat-17.apk`.
 
 ## Install the current Android UAT build
 
-Build 14 is the current private handoff. In the Library, **About** shows the installed version and build. Install over build 13 using **Update**, or run `./scripts/install-android-uat.sh 14` with one authorized phone connected by USB. The installer checks the APK checksum, retains existing data, copies the sample fixtures and opens Readle. See [the UAT checklist](docs/uat/ANDROID_UAT.md). Use the same signing identity and a higher build number for the next update.
+Install Build 17 using **Update**, or run `./scripts/install-android-uat.sh 17` with one authorized phone connected by USB. Confirm the build in **About**. Import your copy of `2510.25819v1.pdf` and select **Plan a walkthrough**. [Build 17 checklist](docs/uat/BUILD_17_WALKTHROUGH.md) · [Build 16 reader checklist](docs/uat/ANDROID_UAT.md).
 
 ## Try it
 

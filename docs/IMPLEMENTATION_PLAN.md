@@ -1,6 +1,8 @@
 # Readle implementation plan
 
-Prepared 2026-11-04, updated 2026-11-12. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. **Build 11 UAT overrides:** new sessions are blank, with session-owned annotations ([ADR 022](adr/022-session-annotations.md)); EPUB is the primary MVP reader/learning format and PDF is retained for source/reference ([ADR 023](adr/023-epub-first.md)). These decisions supersede conflicting text in the original blueprint and earlier build records. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
+Prepared 2026-11-04, updated 2026-11-13. The v1.3 specification and the user's full-workspace session and direct Android APK choices govern this plan. Milestones advance on evidence. **Build 11 UAT overrides:** new sessions are blank, with session-owned annotations ([ADR 022](adr/022-session-annotations.md)); EPUB is the primary MVP reader/learning format and PDF is retained for source/reference ([ADR 023](adr/023-epub-first.md)). These decisions supersede conflicting text in the original blueprint and earlier build records. The first engineering timebox is a two-day reader spike. Engineering checks, emulator results, physical-device results, live-provider checks, and user acceptance have independent recorded status.
+
+**Learning entry point.** Ask what the learner wants to accomplish and what they already know. Recommend an editable path through concepts drawn from the whole source, in an order suited to the goal. Each step presents a Readle explanation, an application or experiment, and links to the original passages. Opening a reference preserves the walkthrough position. Build 17 exercises this flow with a curated edition of the supplied identity-management paper. [Build 17 checklist](uat/BUILD_17_WALKTHROUGH.md).
 
 ## Phase A — Reader spike — P0 — in progress
 
@@ -56,6 +58,8 @@ C02 Add four BYOK adapters and the actual authenticated inference-engine catalog
 D01 Build canonical sections, figures, equations, immutable anchors and edition identity for EPUB first. Depends on A/B source correctness. Verify one technical EPUB. PDF source-to-learning ingestion is deferred under ADR 023, with source-preserving qualification required before adding it.
 
 D02 Add conversion scope/model/effort/cost/egress review, consented execution modes, idempotent per-section units, retries, partial results and versioned lessons. Depends on C/D01. Publish only source-validated sections, preserve original files and keep separate books' learning editions independent. Add ungraded checkpoints in every section and pass-aware session cursors. Test interruption and independently resumed sessions.
+
+D03 Recommend a walkthrough from the verified book-wide concept inventory and the learner's goal, background and desired depth. Use cited concepts from multiple chapters when relevant, explain the order, and allow the learner to change it. Verify that two goals for the same edition yield different starting points and lesson sequences. Persist the selected route, lesson and experiment state with the session. Build 17 exercises two paths on Android with curated sample content. General source extraction and generation depend on D01/D02.
 
 ## Phase E — Pass 2, assessment and recovery — P0 MVP
 

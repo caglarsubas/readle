@@ -3,6 +3,7 @@ import { Text } from 'react-native';
 import renderer, { act, ReactTestRenderer } from 'react-test-renderer';
 import App from '../App';
 import { library } from '../src/library';
+import {identityPaperTitle, identityPaperVersion, startWalkthrough} from '../src/walkthrough';
 
 jest.mock(
   'react-native-safe-area-context',
@@ -21,6 +22,10 @@ jest.mock('../src/library', () => ({
     openSession: jest.fn(),
     importBooks: jest.fn(),
     importFixtures: jest.fn(),
+    createWalkthrough: jest.fn(),
+    learningCursor: jest.fn(),
+    saveLearningCursor: jest.fn(),
+    openWalkthroughSource: jest.fn(),
   },
 }));
 const bridge = library as jest.Mocked<NonNullable<typeof library>>;
@@ -123,4 +128,35 @@ test('sample import reports each outcome and opens an existing sample without cr
   await press('View sample EPUB');
   expect(bridge.sessions).toHaveBeenCalledWith(epub.id);
   expect(bridge.createSession).not.toHaveBeenCalled();
+});
+
+test('the paper opens a goal-specific walkthrough and returns a saved lesson through the session list', async () => {
+  const paper = {...book, sourceVersion: identityPaperVersion};
+  const saved = {...session, mode: 'learn' as const};
+  bridge.books.mockResolvedValue([paper]);
+  bridge.sessions.mockResolvedValue([saved]);
+  bridge.createWalkthrough.mockResolvedValue(saved);
+  bridge.saveLearningCursor.mockResolvedValue();
+  bridge.openWalkthroughSource.mockResolvedValue();
+
+  await act(async () => {
+    app.update(<App key="paper" />);
+  });
+  await press(identityPaperTitle);
+  await press('Plan a walkthrough');
+  await press('Review an agent for security risks');
+  await press('I know the basics');
+  await press('Start walkthrough');
+  expect(bridge.createWalkthrough).toHaveBeenCalledWith(paper.id, startWalkthrough('govern', 'familiar'));
+  await press('4.2 · Durable delegated authority · p. 25');
+  expect(bridge.openWalkthroughSource).toHaveBeenCalledWith(saved.id, 25);
+  await press('Next lesson');
+  const cursor = bridge.saveLearningCursor.mock.calls[0][1];
+  expect(cursor.lesson).toBe('enforcement');
+  bridge.learningCursor.mockResolvedValue(cursor);
+  await press('Back to sessions');
+  await press('Continue latest');
+  expect(bridge.learningCursor).toHaveBeenCalledWith(saved.id);
+  expect(bridge.openSession).not.toHaveBeenCalled();
+  expect(app.root.findAllByType(Text).some(node => node.props.children === 'Enforce policy at the resource')).toBe(true);
 });

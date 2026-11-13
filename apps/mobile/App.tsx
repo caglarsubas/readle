@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   Pressable,
   ScrollView,
   StatusBar,
@@ -11,6 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Book, ImportItem, library, Session } from './src/library';
+import {WalkthroughLesson, WalkthroughSetup} from './src/WalkthroughScreen';
+import {identityPaperTitle, identityPaperVersion, isWalkthroughCursor} from './src/walkthrough';
+import type {WalkthroughCursor} from './src/walkthrough';
 
 function Action({
   label,
@@ -58,7 +62,7 @@ function SessionRow({
         {showBook && session.bookTitle && (
           <Text style={styles.meta}>{session.bookTitle}</Text>
         )}
-        <Text style={styles.body}>{session.location} · Read</Text>
+        <Text style={styles.body}>{session.location} · {session.mode === 'learn' ? 'Learn' : 'Read'}</Text>
         <Text style={styles.meta}>
           {new Date(session.updatedAt).toLocaleString()}
         </Text>
@@ -76,8 +80,24 @@ function LibraryScreen() {
   const [tab, setTab] = useState<'library' | 'continue'>('library');
   const [about, setAbout] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionInProgress = useRef(false);
   const [error, setError] = useState('');
   const [sampleItems, setSampleItems] = useState<ImportItem[]>([]);
+  const [planning, setPlanning] = useState(false);
+  const [walkthrough, setWalkthrough] = useState<{id: string; cursor: WalkthroughCursor} | null>(null);
+  useEffect(() => {
+    if (!planning && !walkthrough) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!busy) {
+        setPlanning(false);
+        setWalkthrough(null);
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [busy, planning, walkthrough]);
   const refresh = useCallback(async () => {
     if (!library) {
       return;
@@ -103,20 +123,37 @@ function LibraryScreen() {
     });
     return () => subscription.remove();
   }, [refresh]);
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, refreshLibrary = true) {
+    if (actionInProgress.current) {
+      return;
+    }
+    actionInProgress.current = true;
     setError('');
     setBusy(true);
     try {
       await action();
-      await refresh();
+      if (refreshLibrary) {
+        await refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Please try again.');
     } finally {
+      actionInProgress.current = false;
       setBusy(false);
     }
   }
   const open = (session: Session) =>
-    run(() => library!.openSession(session.id));
+    run(async () => {
+      if (session.mode === 'learn') {
+        const cursor = await library!.learningCursor(session.id);
+        if (!isWalkthroughCursor(cursor)) {
+          throw new Error('This saved walkthrough could not be restored.');
+        }
+        setWalkthrough({id: session.id, cursor});
+      } else {
+        await library!.openSession(session.id);
+      }
+    });
   const create = () =>
     run(async () => {
       const session = await library!.createSession(selected!.id);
@@ -127,10 +164,33 @@ function LibraryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#F5F4F0" />
       <View style={styles.header}>
         <Text style={styles.brand}>readle</Text>
-        <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
+        {planning || walkthrough ? (
+          <Action label="Back to sessions" secondary onPress={() => {
+            if (!busy) {
+              setPlanning(false);
+              setWalkthrough(null);
+            }
+          }} />
+        ) : (
+          <Action label={about ? 'Close About' : 'About'} onPress={() => setAbout(!about)} secondary />
+        )}
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        {about ? (
+      <ScrollView key={walkthrough?.cursor.lesson ?? (planning ? 'planning' : 'library')}
+        contentContainerStyle={styles.content}>
+        {walkthrough ? (
+          <WalkthroughLesson cursor={walkthrough.cursor} busy={busy}
+            onChange={cursor => run(async () => {
+              await library!.saveLearningCursor(walkthrough.id, cursor);
+              setWalkthrough({...walkthrough, cursor});
+            }, false)}
+            onSource={page => run(() => library!.openWalkthroughSource(walkthrough.id, page), false)} />
+        ) : planning && selected ? (
+          <WalkthroughSetup busy={busy} onStart={cursor => run(async () => {
+            const session = await library!.createWalkthrough(selected.id, cursor);
+            setWalkthrough({id: session.id, cursor});
+            setPlanning(false);
+          })} />
+        ) : about ? (
           <>
             <Text style={styles.heading}>About Readle</Text>
             <Text style={styles.body}>
@@ -152,7 +212,7 @@ function LibraryScreen() {
             <Text style={styles.eyebrow}>
               {selected.format === 'pdf' ? 'PDF SOURCE' : 'EPUB READER'} · STORED ON THIS DEVICE
             </Text>
-            <Text style={styles.heading}>{selected.title}</Text>
+            <Text style={styles.heading}>{selected.sourceVersion === identityPaperVersion ? identityPaperTitle : selected.title}</Text>
             <Text style={styles.body}>
               Resume your work, or start with a blank workspace.
             </Text>
@@ -164,12 +224,15 @@ function LibraryScreen() {
                     onPress={() => open(sessions[0])}
                   />
                 )}
+                {selected.sourceVersion === identityPaperVersion && (
+                  <Action label="Plan a walkthrough" onPress={() => setPlanning(true)} secondary={sessions.length > 0} />
+                )}
                 <Action
                   label={
-                    sessions.length ? 'Start new session' : 'Start reading'
+                    selected.sourceVersion === identityPaperVersion ? 'Read original' : sessions.length ? 'Start new session' : 'Start reading'
                   }
                   onPress={create}
-                  secondary={sessions.length > 0}
+                  secondary={sessions.length > 0 || selected.sourceVersion === identityPaperVersion}
                 />
               </View>
             )}
@@ -295,7 +358,7 @@ function LibraryScreen() {
                       </Text>
                     </View>
                     <View style={styles.grow}>
-                      <Text style={styles.rowTitle}>{book.title}</Text>
+                      <Text style={styles.rowTitle}>{book.sourceVersion === identityPaperVersion ? identityPaperTitle : book.title}</Text>
                       <Text style={styles.meta}>
                         {book.format === 'pdf' ? 'PDF · Source/reference' : 'EPUB · Reader'} · Available offline
                       </Text>
@@ -363,9 +426,11 @@ function LibraryScreen() {
             {error}
           </Text>
         )}
-        <Text style={styles.footer}>
-          Each new session starts without notes or highlights from other sessions.
-        </Text>
+        {!planning && !walkthrough && (
+          <Text style={styles.footer}>
+            Each new session starts without notes or highlights from other sessions.
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

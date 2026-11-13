@@ -9,6 +9,7 @@ import com.facebook.react.uimanager.ViewManager
 import java.io.File
 import java.util.concurrent.Executors
 import org.json.JSONArray
+import org.json.JSONObject
 
 class LibraryModule(private val context: ReactApplicationContext) :
     ReactContextBaseJavaModule(context), ActivityEventListener {
@@ -74,16 +75,58 @@ class LibraryModule(private val context: ReactApplicationContext) :
         async(promise) { database.createSession(bookId) }
 
     @ReactMethod
-    fun openSession(id: String, promise: Promise) {
+    fun createWalkthrough(bookId: String, cursor: ReadableMap, promise: Promise) =
+        async(promise) {
+            val book = database.book(bookId)
+            check(book.getString("sourceVersion") == IDENTITY_PAPER_VERSION) {
+                "Import the sample paper to start this walkthrough."
+            }
+            database.createSession(bookId, JSONObject(cursor.toHashMap()))
+        }
+
+    @ReactMethod
+    fun learningCursor(id: String, promise: Promise) =
+        async(promise) { walkthroughState(id).getJSONObject("learningCursor") }
+
+    @ReactMethod
+    fun saveLearningCursor(id: String, cursor: ReadableMap, promise: Promise) =
+        async(promise) {
+            walkthroughState(id)
+            database.mutateSession(id) { it.put("learningCursor", JSONObject(cursor.toHashMap())) }
+            null
+        }
+
+    private fun walkthroughState(id: String): JSONObject {
+        val session = database.session(id)
+        val state = JSONObject(session.getString("state"))
+        check(state.getString("mode") == "learn" && state.getString("sourceVersion") == IDENTITY_PAPER_VERSION &&
+            database.book(session.getString("bookId")).getString("sourceVersion") == IDENTITY_PAPER_VERSION) {
+            "This walkthrough requires the sample paper edition."
+        }
+        return state
+    }
+
+    @ReactMethod
+    fun openSession(id: String, promise: Promise) = openReader(id, null, promise)
+
+    @ReactMethod
+    fun openWalkthroughSource(id: String, printedPage: Int, promise: Promise) =
+        openReader(id, printedPage, promise)
+
+    private fun openReader(id: String, referencePage: Int?, promise: Promise) {
         try {
             val session = database.session(id)
             check(File(database.book(session.getString("bookId")).getString("path")).exists()) {
                 "Source unavailable. Import the original file again."
             }
+            if (referencePage != null) {
+                walkthroughState(id)
+                require(referencePage in 1..32) { "Source page unavailable." }
+            }
             val activity = context.currentActivity ?: error("Reader activity unavailable")
-            activity.startActivity(
-                Intent(activity, ReaderActivity::class.java).putExtra("sessionId", id)
-            )
+            val intent = Intent(activity, ReaderActivity::class.java).putExtra("sessionId", id)
+            if (referencePage != null) intent.putExtra("referencePageIndex", referencePage)
+            activity.startActivity(intent)
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("SOURCE_UNAVAILABLE", e.message)
@@ -197,6 +240,10 @@ class LibraryModule(private val context: ReactApplicationContext) :
             is JSONArray -> jsonList(item)
             else -> item
         }
+
+    private companion object {
+        const val IDENTITY_PAPER_VERSION = "b019c9420565afe6a3f81fcd8e9b3375f546003cecab93ecfa25d965b2f68bb2"
+    }
 }
 
 class LibraryPackage : ReactPackage {
